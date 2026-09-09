@@ -74,10 +74,28 @@ export interface OverviewStatsDTO {
   average_wpm: number;
   average_accuracy: number;
   best_wpm: number;
+  current_wpm: number;
+  total_errors: number;
   texts_count: number;
   texts_ready: number;
   average_recall_accuracy: number;
   average_dictation_accuracy: number;
+  words_encountered: number;
+  words_learned: number;
+  weak_words_count: number;
+  sentences_completed: number;
+}
+
+export interface HistoryPointDTO {
+  date: string;
+  average_wpm: number;
+  average_accuracy: number;
+  practice_seconds: number;
+}
+
+export interface VocabularyBucketDTO {
+  range: string;
+  count: number;
 }
 
 export interface ErrorInput {

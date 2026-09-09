@@ -9,12 +9,14 @@ import type {
   DictationSessionDTO,
   DictionaryLookupDTO,
   ErrorInput,
+  HistoryPointDTO,
   OverviewStatsDTO,
   RecallAttemptDTO,
   RecallMode,
   RecallSessionDTO,
   SessionDTO,
   TextDTO,
+  VocabularyBucketDTO,
   VocabularyItemDTO,
   WeakWordsSessionDTO,
 } from "@/types";
@@ -110,6 +112,11 @@ export const api = {
     }),
 
   getOverview: () => request<OverviewStatsDTO>("/statistics/overview"),
+
+  getHistory: (days?: number) =>
+    request<HistoryPointDTO[]>(`/statistics/history${days ? `?days=${days}` : ""}`),
+
+  getVocabularyDistribution: () => request<VocabularyBucketDTO[]>("/statistics/vocabulary-distribution"),
 
   updateTranslation: (textId: string, translation_content: string) =>
     request<TextDTO>(`/texts/${textId}/translation`, {

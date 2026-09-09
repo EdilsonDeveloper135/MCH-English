@@ -91,9 +91,6 @@ def score_missing_words_attempt(expected_words: list[str], typed: str) -> tuple[
     return correct, incorrect
 
 
-WEAK_MASTERY_THRESHOLD = 70.0
-
-
 async def build_missing_words_rounds(db: AsyncSession, user_id: uuid.UUID, text: Text) -> list[MissingWordsRound]:
     sentences = await text_repository.get_ordered_sentences(db, text.id)
     # get_weak_words(limit=50) returns the N lowest-mastery words regardless of how
@@ -101,7 +98,7 @@ async def build_missing_words_rounds(db: AsyncSession, user_id: uuid.UUID, text:
     # user has typed. Only genuinely struggling words should out-prioritize the
     # longest-word fallback in select_blanks, hence the extra mastery filter here.
     weak_items = await vocabulary_service.get_weak_words(db, user_id, limit=50)
-    weak_words = {item.word for item in weak_items if item.mastery_score < WEAK_MASTERY_THRESHOLD}
+    weak_words = {item.word for item in weak_items if item.mastery_score < vocabulary_service.WEAK_MASTERY_THRESHOLD}
 
     rounds: list[MissingWordsRound] = []
     for sentence in sentences:

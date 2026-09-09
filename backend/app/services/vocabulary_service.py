@@ -2,7 +2,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.text import Sentence, Text, TextChunk
@@ -10,6 +10,9 @@ from app.models.vocabulary import VocabularyItem
 from app.services.chunking_service import extract_words
 
 MIN_ENCOUNTERS_FOR_WEAK = 2
+WEAK_MASTERY_THRESHOLD = 70.0
+MASTERED_THRESHOLD = 80.0
+MASTERY_BUCKET_RANGES = ["0-20", "20-40", "40-60", "60-80", "80-100"]
 
 
 def mastery_score(encounters: int, typing_errors: int) -> float:
@@ -109,3 +112,47 @@ async def build_weak_words_sentences(
                 matches_for_word += 1
 
     return selected
+
+
+def bucket_mastery_scores(scores: list[float]) -> list[dict]:
+    """Buckets mastery scores into 5 fixed 20-point ranges for the Vocabulary mastery
+    chart (spec section 32). Always returns all 5 buckets in order, count 0 if empty.
+    100.0 (the default for a never-mistyped word) falls in the last bucket."""
+    counts = [0] * len(MASTERY_BUCKET_RANGES)
+    for score in scores:
+        clamped = max(0.0, min(100.0, score))
+        index = min(int(clamped // 20), len(MASTERY_BUCKET_RANGES) - 1)
+        counts[index] += 1
+    return [{"range": label, "count": count} for label, count in zip(MASTERY_BUCKET_RANGES, counts)]
+
+
+async def get_count_stats(db: AsyncSession, user_id: uuid.UUID) -> dict:
+    result = await db.execute(
+        select(
+            func.count(VocabularyItem.id),
+            func.count(case((VocabularyItem.mastery_score >= MASTERED_THRESHOLD, 1))),
+            func.count(
+                case(
+                    (
+                        and_(
+                            VocabularyItem.encounters >= MIN_ENCOUNTERS_FOR_WEAK,
+                            VocabularyItem.mastery_score < WEAK_MASTERY_THRESHOLD,
+                        ),
+                        1,
+                    )
+                )
+            ),
+        ).where(VocabularyItem.user_id == user_id)
+    )
+    words_encountered, words_learned, weak_words_count = result.one()
+    return {
+        "words_encountered": words_encountered,
+        "words_learned": words_learned,
+        "weak_words_count": weak_words_count,
+    }
+
+
+async def get_mastery_distribution(db: AsyncSession, user_id: uuid.UUID) -> list[dict]:
+    result = await db.execute(select(VocabularyItem.mastery_score).where(VocabularyItem.user_id == user_id))
+    scores = list(result.scalars().all())
+    return bucket_mastery_scores(scores)
