@@ -5,6 +5,8 @@ import type {
   BlankDTO,
   ChunkDTO,
   ChunkMode,
+  DictationAttemptDTO,
+  DictationSessionDTO,
   DictionaryLookupDTO,
   ErrorInput,
   OverviewStatsDTO,
@@ -162,4 +164,42 @@ export const api = {
 
   finishRecallSession: (sessionId: string) =>
     request<void>(`/recall/sessions/${sessionId}/finish`, { method: "PATCH" }),
+
+  createDictationSession: (text_id: string) =>
+    request<DictationSessionDTO>("/dictation/sessions", {
+      method: "POST",
+      body: JSON.stringify({ text_id }),
+    }),
+
+  submitDictationAttempt: (params: {
+    dictation_session_id: string;
+    sentence_id: string;
+    typed: string;
+    correct_characters: number;
+    incorrect_characters: number;
+    total_characters: number;
+    duration_seconds: number;
+  }) =>
+    request<DictationAttemptDTO>("/dictation/attempts", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+
+  finishDictationSession: (sessionId: string) =>
+    request<void>(`/dictation/sessions/${sessionId}/finish`, { method: "PATCH" }),
+
+  // <audio src> can't carry an Authorization header, so audio is fetched as a blob
+  // and exposed as an Object URL instead. Caller is responsible for revoking it
+  // (URL.revokeObjectURL) once no longer needed.
+  getDictationAudioUrl: async (sentenceId: string): Promise<string> => {
+    const token = useAuthStore.getState().token;
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const response = await fetch(`${BASE_URL}/dictation/audio/${sentenceId}`, { headers });
+    if (!response.ok) throw new ApiError(response.status, response.statusText);
+
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  },
 };

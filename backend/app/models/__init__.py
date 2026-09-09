@@ -1,3 +1,4 @@
+from app.models.dictation import DictationAttempt, DictationAudio, DictationSession
 from app.models.dictionary import DictionaryEntry
 from app.models.recall import RecallAttempt, RecallSession
 from app.models.text import Sentence, SentenceTranslationLink, Text, TextChunk, TranslationSentence
@@ -18,4 +19,7 @@ __all__ = [
     "VocabularyItem",
     "RecallSession",
     "RecallAttempt",
+    "DictationAudio",
+    "DictationSession",
+    "DictationAttempt",
 ]

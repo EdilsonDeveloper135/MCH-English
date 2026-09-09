@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.dictation import DictationAttempt, DictationSession
 from app.models.recall import RecallAttempt, RecallSession
 from app.repositories import session_repository, text_repository
 
@@ -18,9 +19,17 @@ async def get_overview(db: AsyncSession, user_id: uuid.UUID) -> dict:
     )
     average_recall_accuracy = round(float(recall_result.scalar_one()), 2)
 
+    dictation_result = await db.execute(
+        select(func.coalesce(func.avg(DictationAttempt.accuracy), 0))
+        .join(DictationSession, DictationAttempt.dictation_session_id == DictationSession.id)
+        .where(DictationSession.user_id == user_id)
+    )
+    average_dictation_accuracy = round(float(dictation_result.scalar_one()), 2)
+
     return {
         **stats,
         "texts_count": len(texts),
         "texts_ready": sum(1 for t in texts if t.status == "ready"),
         "average_recall_accuracy": average_recall_accuracy,
+        "average_dictation_accuracy": average_dictation_accuracy,
     }

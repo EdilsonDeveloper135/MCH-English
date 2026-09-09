@@ -47,6 +47,7 @@ export default function ProgressPage() {
           <Stat label="Precision promedio" value={`${stats.average_accuracy}%`} />
           <Stat label="Textos listos" value={`${stats.texts_ready} / ${stats.texts_count}`} />
           <Stat label="Precision en Recall" value={`${stats.average_recall_accuracy}%`} />
+          <Stat label="Precision en Dictation" value={`${stats.average_dictation_accuracy}%`} />
         </div>
       )}
     </div>

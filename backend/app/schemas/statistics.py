@@ -10,3 +10,4 @@ class OverviewStats(BaseModel):
     texts_count: int
     texts_ready: int
     average_recall_accuracy: float
+    average_dictation_accuracy: float

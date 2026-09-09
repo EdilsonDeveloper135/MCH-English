@@ -77,6 +77,7 @@ export interface OverviewStatsDTO {
   texts_count: number;
   texts_ready: number;
   average_recall_accuracy: number;
+  average_dictation_accuracy: number;
 }
 
 export interface ErrorInput {
@@ -129,6 +130,25 @@ export interface RecallSessionDTO {
 }
 
 export interface RecallAttemptDTO {
+  id: string;
+  expected: string;
+  typed: string;
+  accuracy: number;
+  correct_words: number;
+  incorrect_words: number;
+}
+
+export interface DictationRoundDTO {
+  sentence_id: string;
+  content: string;
+}
+
+export interface DictationSessionDTO {
+  session_id: string;
+  rounds: DictationRoundDTO[];
+}
+
+export interface DictationAttemptDTO {
   id: string;
   expected: string;
   typed: string;

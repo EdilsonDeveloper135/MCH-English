@@ -181,6 +181,11 @@ export default function LibraryPage() {
                     Recall
                   </button>
                 )}
+                {t.status === "ready" && (
+                  <button onClick={() => router.push(`/dictation/${t.id}`)} className="text-white underline">
+                    Dictation
+                  </button>
+                )}
                 <button onClick={() => handleDelete(t.id)} className="text-gray-500 hover:text-red-500">
                   Eliminar
                 </button>
