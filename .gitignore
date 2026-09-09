@@ -1,0 +1,26 @@
+# Env
+.env
+.env.local
+
+# Node / frontend
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# Python / backend
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Docker volumes / data
+postgres_data/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.log
