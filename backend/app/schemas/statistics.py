@@ -9,3 +9,4 @@ class OverviewStats(BaseModel):
     best_wpm: float
     texts_count: int
     texts_ready: int
+    average_recall_accuracy: float

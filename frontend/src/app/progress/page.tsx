@@ -46,6 +46,7 @@ export default function ProgressPage() {
           <Stat label="Mejor WPM" value={stats.best_wpm} />
           <Stat label="Precision promedio" value={`${stats.average_accuracy}%`} />
           <Stat label="Textos listos" value={`${stats.texts_ready} / ${stats.texts_count}`} />
+          <Stat label="Precision en Recall" value={`${stats.average_recall_accuracy}%`} />
         </div>
       )}
     </div>

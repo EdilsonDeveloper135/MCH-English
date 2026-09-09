@@ -76,6 +76,7 @@ export interface OverviewStatsDTO {
   best_wpm: number;
   texts_count: number;
   texts_ready: number;
+  average_recall_accuracy: number;
 }
 
 export interface ErrorInput {
@@ -104,4 +105,34 @@ export interface WeakWordsSessionDTO {
   session_id: string;
   words: string[];
   sentences: WeakWordSentenceDTO[];
+}
+
+export type RecallMode = "missing_words" | "spanish_to_english";
+
+export interface BlankDTO {
+  start: number;
+  end: number;
+}
+
+export interface RecallRoundDTO {
+  sentence_id: string;
+  content: string | null;
+  blanks: BlankDTO[] | null;
+  spanish_prompt: string | null;
+  english_content: string | null;
+}
+
+export interface RecallSessionDTO {
+  session_id: string;
+  mode: RecallMode;
+  rounds: RecallRoundDTO[];
+}
+
+export interface RecallAttemptDTO {
+  id: string;
+  expected: string;
+  typed: string;
+  accuracy: number;
+  correct_words: number;
+  incorrect_words: number;
 }

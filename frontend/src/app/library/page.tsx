@@ -176,6 +176,11 @@ export default function LibraryPage() {
                     Abrir
                   </button>
                 )}
+                {t.status === "ready" && (
+                  <button onClick={() => router.push(`/recall/${t.id}`)} className="text-white underline">
+                    Recall
+                  </button>
+                )}
                 <button onClick={() => handleDelete(t.id)} className="text-gray-500 hover:text-red-500">
                   Eliminar
                 </button>

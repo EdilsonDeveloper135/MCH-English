@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, dictionary, sessions, statistics, texts, vocabulary
+from app.api import auth, dictionary, recall, sessions, statistics, texts, vocabulary
 
 app = FastAPI(title="MCH-English API")
 
@@ -19,6 +19,7 @@ app.include_router(sessions.router, prefix="/sessions", tags=["sessions"])
 app.include_router(statistics.router, prefix="/statistics", tags=["statistics"])
 app.include_router(dictionary.router, prefix="/dictionary", tags=["dictionary"])
 app.include_router(vocabulary.router, prefix="/vocabulary", tags=["vocabulary"])
+app.include_router(recall.router, prefix="/recall", tags=["recall"])
 
 
 @app.get("/health")

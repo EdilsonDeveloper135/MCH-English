@@ -67,6 +67,12 @@ def extract_words(text: str) -> list[str]:
     return _WORD_RE.findall(text)
 
 
+def find_words_with_spans(text: str) -> list[tuple[int, int, str]]:
+    """Same word matches as extract_words, but with their (start, end) character
+    offsets in `text` -- needed to know where to place Recall's Missing Words blanks."""
+    return [(m.start(), m.end(), m.group()) for m in _WORD_RE.finditer(text)]
+
+
 def split_into_sentences(text: str) -> list[str]:
     """Flat, paragraph-aware sentence list. Paragraph breaks only act as sentence
     boundaries here -- unlike build_chunks, no chunk grouping is applied. Used for the

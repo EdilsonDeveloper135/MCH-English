@@ -2,11 +2,15 @@ import { useAuthStore } from "@/stores/authStore";
 import type {
   AlignmentDTO,
   AlignmentLinkDTO,
+  BlankDTO,
   ChunkDTO,
   ChunkMode,
   DictionaryLookupDTO,
   ErrorInput,
   OverviewStatsDTO,
+  RecallAttemptDTO,
+  RecallMode,
+  RecallSessionDTO,
   SessionDTO,
   TextDTO,
   VocabularyItemDTO,
@@ -134,4 +138,28 @@ export const api = {
   getWeakWords: () => request<VocabularyItemDTO[]>("/vocabulary/weak"),
 
   startWeakWordsSession: () => request<WeakWordsSessionDTO>("/vocabulary/weak/session", { method: "POST" }),
+
+  createRecallSession: (text_id: string, mode: RecallMode) =>
+    request<RecallSessionDTO>("/recall/sessions", {
+      method: "POST",
+      body: JSON.stringify({ text_id, mode }),
+    }),
+
+  submitRecallAttempt: (params: {
+    recall_session_id: string;
+    sentence_id: string;
+    typed: string;
+    blanks?: BlankDTO[];
+    correct_characters: number;
+    incorrect_characters: number;
+    total_characters: number;
+    duration_seconds: number;
+  }) =>
+    request<RecallAttemptDTO>("/recall/attempts", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+
+  finishRecallSession: (sessionId: string) =>
+    request<void>(`/recall/sessions/${sessionId}/finish`, { method: "PATCH" }),
 };

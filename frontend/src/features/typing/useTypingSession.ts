@@ -17,6 +17,9 @@ export interface ChunkCompleteStats {
   total_characters: number;
   duration_seconds: number;
   errors: ErrorInput[];
+  /** Final per-character correctness, in case a caller needs to reconstruct what was
+   * actually typed (e.g. Recall attempts) instead of just the aggregate counts. */
+  finalCharStates: CharStatus[];
 }
 
 interface TargetSentence {
@@ -150,9 +153,11 @@ export function useTypingSession({
       const isCorrect = typedChar === expected;
       const nextIndex = currentIndex + 1;
 
+      let finalCharStates: CharStatus[] = charStates;
       setCharStates((prev) => {
         const next = [...prev];
         next[currentIndex] = isCorrect ? "correct" : "incorrect";
+        finalCharStates = next;
         return next;
       });
       setCurrentIndex(nextIndex);
@@ -192,6 +197,7 @@ export function useTypingSession({
           total_characters: finalCorrectCount + finalIncorrectCount,
           duration_seconds: durationSeconds,
           errors: finalErrors,
+          finalCharStates,
         });
       }
     },
@@ -205,6 +211,7 @@ export function useTypingSession({
       correctCount,
       incorrectCount,
       errors,
+      charStates,
       onComplete,
       onWordError,
     ]
