@@ -63,6 +63,10 @@ def count_words(text: str) -> int:
     return len(_WORD_RE.findall(text))
 
 
+def extract_words(text: str) -> list[str]:
+    return _WORD_RE.findall(text)
+
+
 def split_into_sentences(text: str) -> list[str]:
     """Flat, paragraph-aware sentence list. Paragraph breaks only act as sentence
     boundaries here -- unlike build_chunks, no chunk grouping is applied. Used for the

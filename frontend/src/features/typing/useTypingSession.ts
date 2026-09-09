@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { ErrorInput, SentenceDTO } from "@/types";
+import type { ErrorInput } from "@/types";
 
 export type CharStatus = "pending" | "correct" | "incorrect";
 
@@ -19,10 +19,16 @@ export interface ChunkCompleteStats {
   errors: ErrorInput[];
 }
 
-/** Concatenates a chunk's sentences into one flowing string plus each sentence's
- * [start, end) character range within it, used to render the whole chunk as a
- * single continuous typing target (per the product spec: no separate boxes). */
-export function buildTargetText(sentences: SentenceDTO[]): { text: string; sentenceRanges: SentenceRange[] } {
+interface TargetSentence {
+  id: string;
+  content: string;
+}
+
+/** Concatenates sentences into one flowing string plus each sentence's [start, end)
+ * character range within it, used to render the whole thing as a single continuous
+ * typing target (per the product spec: no separate boxes). Works for a text chunk's
+ * sentences or an ad-hoc list (e.g. a Weak Words review session). */
+export function buildTargetText(sentences: TargetSentence[]): { text: string; sentenceRanges: SentenceRange[] } {
   let text = "";
   const sentenceRanges: SentenceRange[] = [];
 

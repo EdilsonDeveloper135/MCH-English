@@ -9,6 +9,8 @@ import type {
   OverviewStatsDTO,
   SessionDTO,
   TextDTO,
+  VocabularyItemDTO,
+  WeakWordsSessionDTO,
 } from "@/types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -126,4 +128,10 @@ export const api = {
       throw err;
     }
   },
+
+  getVocabulary: () => request<VocabularyItemDTO[]>("/vocabulary"),
+
+  getWeakWords: () => request<VocabularyItemDTO[]>("/vocabulary/weak"),
+
+  startWeakWordsSession: () => request<WeakWordsSessionDTO>("/vocabulary/weak/session", { method: "POST" }),
 };

@@ -85,6 +85,9 @@ export default function LibraryPage() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-xl font-semibold text-white">Library</h1>
         <div className="flex gap-4 text-sm text-gray-400">
+          <Link href="/vocabulary" className="hover:text-white">
+            Vocabulary
+          </Link>
           <Link href="/progress" className="hover:text-white">
             Progress
           </Link>

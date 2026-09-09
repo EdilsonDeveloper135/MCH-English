@@ -11,8 +11,8 @@ class SessionCreate(BaseModel):
 
 class SessionOut(BaseModel):
     id: str
-    text_id: str
-    chunk_id: str
+    text_id: str | None
+    chunk_id: str | None
     started_at: datetime
     finished_at: datetime | None
     correct_characters: int

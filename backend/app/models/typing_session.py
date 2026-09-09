@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, func
+from sqlalchemy import ARRAY, DateTime, Float, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -15,12 +15,17 @@ class TypingSession(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    text_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("texts.id", ondelete="CASCADE"), nullable=False
+    # Null for a Weak Words review session, which draws sentences from across the
+    # user's whole library rather than belonging to one text/chunk.
+    text_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("texts.id", ondelete="CASCADE"), nullable=True
     )
-    chunk_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("text_chunks.id", ondelete="CASCADE"), nullable=False
+    chunk_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("text_chunks.id", ondelete="CASCADE"), nullable=True
     )
+    # Only set for a review session: the exact (real) sentence ids it was built from,
+    # so vocabulary encounters can be recomputed at finish time.
+    review_sentence_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     correct_characters: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

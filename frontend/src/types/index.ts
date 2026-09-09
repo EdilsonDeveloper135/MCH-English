@@ -57,8 +57,8 @@ export interface ChunkDTO {
 
 export interface SessionDTO {
   id: string;
-  text_id: string;
-  chunk_id: string;
+  text_id: string | null;
+  chunk_id: string | null;
   started_at: string;
   finished_at: string | null;
   correct_characters: number;
@@ -84,4 +84,24 @@ export interface ErrorInput {
   position: number;
   word: string;
   sentence_id: string | null;
+}
+
+export interface VocabularyItemDTO {
+  word: string;
+  translation: string | null;
+  encounters: number;
+  typing_errors: number;
+  mastery_score: number;
+  last_seen: string;
+}
+
+export interface WeakWordSentenceDTO {
+  id: string;
+  content: string;
+}
+
+export interface WeakWordsSessionDTO {
+  session_id: string;
+  words: string[];
+  sentences: WeakWordSentenceDTO[];
 }

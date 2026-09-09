@@ -9,6 +9,7 @@ from app.models.typing_session import TypingSession
 from app.models.user import User
 from app.repositories import session_repository, text_repository
 from app.schemas.sessions import SessionCreate, SessionFinish, SessionOut
+from app.services import vocabulary_service
 from app.services.typing_service import calculate_accuracy, calculate_wpm
 
 router = APIRouter()
@@ -17,8 +18,8 @@ router = APIRouter()
 def _to_session_out(session: TypingSession) -> SessionOut:
     return SessionOut(
         id=str(session.id),
-        text_id=str(session.text_id),
-        chunk_id=str(session.chunk_id),
+        text_id=str(session.text_id) if session.text_id else None,
+        chunk_id=str(session.chunk_id) if session.chunk_id else None,
         started_at=session.started_at,
         finished_at=session.finished_at,
         correct_characters=session.correct_characters,
@@ -90,4 +91,9 @@ async def finish_session(
         accuracy=accuracy,
         errors=errors,
     )
+
+    session_sentences = await session_repository.get_sentences_for_session(db, session)
+    error_words = {err.word.lower() for err in payload.errors if err.word}
+    await vocabulary_service.record_session_words(db, current_user.id, session_sentences, error_words)
+
     return _to_session_out(session)

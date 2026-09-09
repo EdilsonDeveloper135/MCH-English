@@ -4,11 +4,25 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.text import Sentence
 from app.models.typing_session import TypingError, TypingSession
 
 
-async def create(db: AsyncSession, *, user_id: uuid.UUID, text_id: uuid.UUID, chunk_id: uuid.UUID) -> TypingSession:
-    session = TypingSession(user_id=user_id, text_id=text_id, chunk_id=chunk_id, errors=[])
+async def create(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    text_id: uuid.UUID | None = None,
+    chunk_id: uuid.UUID | None = None,
+    review_sentence_ids: list[uuid.UUID] | None = None,
+) -> TypingSession:
+    session = TypingSession(
+        user_id=user_id,
+        text_id=text_id,
+        chunk_id=chunk_id,
+        review_sentence_ids=review_sentence_ids,
+        errors=[],
+    )
     db.add(session)
     await db.commit()
     return session
@@ -19,6 +33,20 @@ async def get_by_id(db: AsyncSession, session_id: uuid.UUID, user_id: uuid.UUID)
         select(TypingSession).where(TypingSession.id == session_id, TypingSession.user_id == user_id)
     )
     return result.scalar_one_or_none()
+
+
+async def get_sentences_for_session(db: AsyncSession, session: TypingSession) -> list[Sentence]:
+    """Resolves the real sentences a session covered -- a chunk's sentences for a
+    normal practice session, or the stored ad-hoc list for a Weak Words review."""
+    if session.chunk_id is not None:
+        result = await db.execute(select(Sentence).where(Sentence.chunk_id == session.chunk_id))
+        return list(result.scalars().all())
+
+    if session.review_sentence_ids:
+        result = await db.execute(select(Sentence).where(Sentence.id.in_(session.review_sentence_ids)))
+        return list(result.scalars().all())
+
+    return []
 
 
 async def finish(

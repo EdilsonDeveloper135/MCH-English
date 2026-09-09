@@ -26,9 +26,14 @@ export default function ProgressPage() {
     <div className="min-h-screen px-6 py-10 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-xl font-semibold text-white">Progress</h1>
-        <Link href="/library" className="text-sm text-gray-400 hover:text-white">
-          Library
-        </Link>
+        <div className="flex gap-4 text-sm text-gray-400">
+          <Link href="/vocabulary" className="hover:text-white">
+            Vocabulary
+          </Link>
+          <Link href="/library" className="hover:text-white">
+            Library
+          </Link>
+        </div>
       </div>
 
       {!stats ? (
