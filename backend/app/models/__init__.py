@@ -1,4 +1,5 @@
-from app.models.text import Sentence, Text, TextChunk
+from app.models.dictionary import DictionaryEntry
+from app.models.text import Sentence, SentenceTranslationLink, Text, TextChunk, TranslationSentence
 from app.models.typing_session import TypingError, TypingSession
 from app.models.user import User
 
@@ -7,6 +8,9 @@ __all__ = [
     "Text",
     "TextChunk",
     "Sentence",
+    "TranslationSentence",
+    "SentenceTranslationLink",
+    "DictionaryEntry",
     "TypingSession",
     "TypingError",
 ]

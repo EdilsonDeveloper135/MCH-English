@@ -48,6 +48,7 @@ interface UseTypingSessionArgs {
   initialIndex?: number;
   onSentenceComplete?: (sentenceId: string, endIndex: number) => void;
   onComplete?: (stats: ChunkCompleteStats) => void;
+  onWordError?: (word: string) => void;
 }
 
 export function useTypingSession({
@@ -56,6 +57,7 @@ export function useTypingSession({
   initialIndex = 0,
   onSentenceComplete,
   onComplete,
+  onWordError,
 }: UseTypingSessionArgs) {
   const clampedInitial = Math.min(Math.max(initialIndex, 0), targetText.length);
 
@@ -158,18 +160,20 @@ export function useTypingSession({
         setCorrectCount(finalCorrectCount);
       } else {
         finalIncorrectCount = incorrectCount + 1;
+        const word = wordAtPosition(targetText, currentIndex);
         finalErrors = [
           ...errors,
           {
             expected_char: expected,
             typed_char: typedChar,
             position: currentIndex,
-            word: wordAtPosition(targetText, currentIndex),
+            word,
             sentence_id: sentenceIdAt(currentIndex),
           },
         ];
         setIncorrectCount(finalIncorrectCount);
         setErrors(finalErrors);
+        if (word) onWordError?.(word);
       }
 
       checkSentenceCompletion(nextIndex);
@@ -196,6 +200,7 @@ export function useTypingSession({
       incorrectCount,
       errors,
       onComplete,
+      onWordError,
     ]
   );
 

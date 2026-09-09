@@ -24,7 +24,7 @@ services:
   migrate:
     build:
       context: ./backend
-    command: alembic upgrade head
+    command: sh -c "alembic upgrade head && python -m app.workers.seed_dictionary"
     env_file: .env
     depends_on:
       postgres:

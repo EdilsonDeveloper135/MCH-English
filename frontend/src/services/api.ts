@@ -1,5 +1,15 @@
 import { useAuthStore } from "@/stores/authStore";
-import type { ChunkDTO, ChunkMode, ErrorInput, OverviewStatsDTO, SessionDTO, TextDTO } from "@/types";
+import type {
+  AlignmentDTO,
+  AlignmentLinkDTO,
+  ChunkDTO,
+  ChunkMode,
+  DictionaryLookupDTO,
+  ErrorInput,
+  OverviewStatsDTO,
+  SessionDTO,
+  TextDTO,
+} from "@/types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -61,10 +71,10 @@ export const api = {
 
   listTexts: () => request<TextDTO[]>("/texts"),
 
-  createText: (title: string, raw_content: string, chunk_mode: ChunkMode) =>
+  createText: (title: string, raw_content: string, chunk_mode: ChunkMode, translation_content?: string) =>
     request<TextDTO>("/texts", {
       method: "POST",
-      body: JSON.stringify({ title, raw_content, chunk_mode }),
+      body: JSON.stringify({ title, raw_content, chunk_mode, translation_content: translation_content || null }),
     }),
 
   getText: (id: string) => request<TextDTO>(`/texts/${id}`),
@@ -92,4 +102,28 @@ export const api = {
     }),
 
   getOverview: () => request<OverviewStatsDTO>("/statistics/overview"),
+
+  updateTranslation: (textId: string, translation_content: string) =>
+    request<TextDTO>(`/texts/${textId}/translation`, {
+      method: "PATCH",
+      body: JSON.stringify({ translation_content }),
+    }),
+
+  getAlignment: (textId: string) => request<AlignmentDTO>(`/texts/${textId}/alignment`),
+
+  updateAlignment: (textId: string, links: AlignmentLinkDTO[]) =>
+    request<AlignmentDTO>(`/texts/${textId}/alignment`, {
+      method: "PUT",
+      body: JSON.stringify({ links }),
+    }),
+
+  lookupWord: async (word: string): Promise<string | null> => {
+    try {
+      const result = await request<DictionaryLookupDTO>(`/dictionary/${encodeURIComponent(word.toLowerCase())}`);
+      return result.translations;
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
+  },
 };

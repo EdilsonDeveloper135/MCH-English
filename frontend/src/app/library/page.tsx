@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/authStore";
 import { api } from "@/services/api";
-import type { ChunkMode, TextDTO } from "@/types";
+import type { AlignmentStatus, ChunkMode, TextDTO } from "@/types";
+
+const ALIGNMENT_LABEL: Record<AlignmentStatus, string> = {
+  not_provided: "",
+  needs_review: "pendiente de revision",
+  confirmed: "confirmada",
+};
 
 const CHUNK_MODES: { value: ChunkMode; label: string }[] = [
   { value: "short", label: "Corto (30-50 palabras)" },
@@ -24,6 +30,7 @@ export default function LibraryPage() {
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [translation, setTranslation] = useState("");
   const [chunkMode, setChunkMode] = useState<ChunkMode>("normal");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,9 +62,10 @@ export default function LibraryPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await api.createText(title.trim() || "Texto sin titulo", content, chunkMode);
+      await api.createText(title.trim() || "Texto sin titulo", content, chunkMode, translation.trim());
       setTitle("");
       setContent("");
+      setTranslation("");
       await refresh();
     } catch {
       setError("No se pudo guardar el texto.");
@@ -101,6 +109,13 @@ export default function LibraryPage() {
           rows={6}
           className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-600"
         />
+        <textarea
+          placeholder="Traduccion completa al espanol (opcional) - la usaremos como referencia oficial, sin IA"
+          value={translation}
+          onChange={(e) => setTranslation(e.target.value)}
+          rows={6}
+          className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-600"
+        />
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <select
             value={chunkMode}
@@ -136,13 +151,23 @@ export default function LibraryPage() {
                 <p className="text-white truncate">{t.title}</p>
                 <p className="text-xs text-gray-500">
                   {t.status === "ready"
-                    ? `${t.word_count} palabras · ${t.progress_percent}%`
+                    ? `${t.word_count} palabras · ${t.progress_percent}%${
+                        t.has_translation ? ` · traduccion ${ALIGNMENT_LABEL[t.alignment_status]}` : ""
+                      }`
                     : t.status === "failed"
                       ? `Error: ${t.error_message ?? "desconocido"}`
                       : "Procesando..."}
                 </p>
               </div>
               <div className="flex gap-3 text-sm shrink-0">
+                {t.status === "ready" && t.has_translation && t.alignment_status === "needs_review" && (
+                  <button
+                    onClick={() => router.push(`/library/${t.id}/align`)}
+                    className="text-cyan-400 underline"
+                  >
+                    Revisar alineacion
+                  </button>
+                )}
                 {t.status === "ready" && (
                   <button onClick={() => router.push(`/practice/${t.id}`)} className="text-white underline">
                     Abrir

@@ -7,9 +7,18 @@ import { api } from "@/services/api";
 import type { ChunkDTO, TextDTO } from "@/types";
 import { TypingText } from "@/features/typing/TypingText";
 import { TypingStats } from "@/features/typing/TypingStats";
+import { TranslationPanel } from "@/features/typing/TranslationPanel";
+import { WordHelpTooltip } from "@/features/typing/WordHelpTooltip";
 import { buildTargetText, useTypingSession, type ChunkCompleteStats } from "@/features/typing/useTypingSession";
 
-type LoadState = "loading" | "processing" | "ready" | "failed" | "finished-text" | "error";
+type LoadState =
+  | "loading"
+  | "processing"
+  | "ready"
+  | "failed"
+  | "finished-text"
+  | "needs-alignment"
+  | "error";
 
 export default function PracticePage() {
   const params = useParams<{ textId: string }>();
@@ -23,6 +32,8 @@ export default function PracticePage() {
   const [chunk, setChunk] = useState<ChunkDTO | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chunkSummary, setChunkSummary] = useState<{ wpm: number; accuracy: number } | null>(null);
+  const [lastTranslation, setLastTranslation] = useState<string | null>(null);
+  const [errorWord, setErrorWord] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -30,6 +41,10 @@ export default function PracticePage() {
   }, [hasHydrated, token, router]);
 
   const loadChunk = useCallback(async (currentText: TextDTO) => {
+    if (currentText.has_translation && currentText.alignment_status === "needs_review") {
+      setLoadState("needs-alignment");
+      return;
+    }
     if (currentText.current_chunk_index >= currentText.chunk_count) {
       setLoadState("finished-text");
       return;
@@ -79,12 +94,18 @@ export default function PracticePage() {
     : { text: "", sentenceRanges: [] };
 
   const handleSentenceComplete = useCallback(
-    (_sentenceId: string, endIndex: number) => {
+    (sentenceId: string, endIndex: number) => {
       if (!text || !chunk) return;
+      const sentence = chunk.sentences.find((s) => s.id === sentenceId);
+      setLastTranslation(sentence?.translation ?? null);
       api.updateProgress(text.id, chunk.index, endIndex).catch(() => {});
     },
     [text, chunk]
   );
+
+  const handleWordError = useCallback((word: string) => {
+    setErrorWord(word);
+  }, []);
 
   const handleChunkComplete = useCallback(
     async (stats: ChunkCompleteStats) => {
@@ -104,10 +125,12 @@ export default function PracticePage() {
     initialIndex,
     onSentenceComplete: handleSentenceComplete,
     onComplete: handleChunkComplete,
+    onWordError: handleWordError,
   });
 
   useEffect(() => {
     inputRef.current?.focus();
+    setLastTranslation(null);
   }, [chunk]);
 
   if (loadState === "loading") return <CenteredMessage text="Cargando..." />;
@@ -121,6 +144,18 @@ export default function PracticePage() {
       <CenteredMessage text="Ya completaste este texto.">
         <button onClick={() => router.push("/library")} className="mt-4 underline text-sm">
           Volver a la biblioteca
+        </button>
+      </CenteredMessage>
+    );
+  }
+  if (loadState === "needs-alignment") {
+    return (
+      <CenteredMessage text="Revisa la alineacion de la traduccion antes de practicar este texto.">
+        <button
+          onClick={() => router.push(`/library/${textId}/align`)}
+          className="mt-4 underline text-sm"
+        >
+          Revisar alineacion
         </button>
       </CenteredMessage>
     );
@@ -155,9 +190,14 @@ export default function PracticePage() {
             onContinue={() => window.location.reload()}
           />
         ) : (
-          <TypingText targetText={targetText} charStates={charStates} currentIndex={currentIndex} />
+          <>
+            <TypingText targetText={targetText} charStates={charStates} currentIndex={currentIndex} />
+            <TranslationPanel translation={lastTranslation} />
+          </>
         )}
       </div>
+
+      <WordHelpTooltip word={errorWord} />
     </div>
   );
 }

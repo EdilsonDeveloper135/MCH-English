@@ -9,10 +9,13 @@ CHUNK_RANGES: dict[str, tuple[int, int]] = {
 }
 
 # Common abbreviations that end in a period but do NOT end a sentence. Used to avoid
-# false-positive sentence breaks like "Mr. Smith" -> ["Mr.", "Smith ..."].
+# false-positive sentence breaks like "Mr. Smith" -> ["Mr.", "Smith ..."]. Covers both
+# English and Spanish since this splitter is reused for the user-supplied translation
+# (section title "sr."/"sra."/"dra." etc. are the Spanish equivalents).
 _ABBREVIATIONS = {
     "mr.", "mrs.", "ms.", "dr.", "prof.", "sr.", "jr.", "vs.", "etc.",
     "e.g.", "i.e.", "u.s.", "u.k.", "st.", "mt.", "no.", "inc.", "ltd.", "co.",
+    "sra.", "srta.", "dra.", "ud.", "uds.", "pág.", "págs.",
 }
 
 # Splits right after sentence-ending punctuation, only when followed by whitespace and
@@ -58,6 +61,14 @@ def split_sentences(paragraph: str) -> list[str]:
 
 def count_words(text: str) -> int:
     return len(_WORD_RE.findall(text))
+
+
+def split_into_sentences(text: str) -> list[str]:
+    """Flat, paragraph-aware sentence list. Paragraph breaks only act as sentence
+    boundaries here -- unlike build_chunks, no chunk grouping is applied. Used for the
+    user-supplied translation, which doesn't need Smart Chunking of its own."""
+    cleaned = clean_text(text)
+    return [s for paragraph in split_paragraphs(cleaned) for s in split_sentences(paragraph)]
 
 
 def build_chunks(raw_content: str, chunk_mode: str) -> list[list[str]]:

@@ -1,5 +1,6 @@
 export type ChunkMode = "short" | "normal" | "long" | "continuous";
 export type TextStatus = "pending" | "processing" | "ready" | "failed";
+export type AlignmentStatus = "not_provided" | "needs_review" | "confirmed";
 
 export interface TextDTO {
   id: string;
@@ -12,6 +13,8 @@ export interface TextDTO {
   current_character_index: number;
   progress_percent: number;
   error_message: string | null;
+  has_translation: boolean;
+  alignment_status: AlignmentStatus;
   created_at: string;
 }
 
@@ -19,6 +22,29 @@ export interface SentenceDTO {
   id: string;
   index: number;
   content: string;
+  translation: string | null;
+}
+
+export interface AlignmentSentenceDTO {
+  index: number;
+  content: string;
+}
+
+export interface AlignmentLinkDTO {
+  english_index: number;
+  spanish_index: number;
+}
+
+export interface AlignmentDTO {
+  alignment_status: AlignmentStatus;
+  english_sentences: AlignmentSentenceDTO[];
+  spanish_sentences: AlignmentSentenceDTO[];
+  links: AlignmentLinkDTO[];
+}
+
+export interface DictionaryLookupDTO {
+  word: string;
+  translations: string;
 }
 
 export interface ChunkDTO {

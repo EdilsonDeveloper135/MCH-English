@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.database import async_session_maker
 from app.models.text import Sentence, Text, TextChunk
 from app.services.chunking_service import build_chunks, count_words
+from app.services.translation_service import realign_translation
 
 _redis_conn = redis.from_url(settings.redis_url)
 _queue = Queue("text-processing", connection=_redis_conn)
@@ -47,6 +48,11 @@ async def _process_text_async(text_id_str: str) -> None:
 
                 for sentence_index, sentence_content in enumerate(sentences):
                     db.add(Sentence(chunk_id=chunk.id, index=sentence_index, content=sentence_content))
+
+            await db.flush()  # populate sentence ids before alignment links them
+
+            if (text.translation_content or "").strip():
+                await realign_translation(db, text)
 
             text.status = "ready"
             text.error_message = None
