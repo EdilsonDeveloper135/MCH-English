@@ -15,7 +15,7 @@ class Text(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     raw_content: Mapped[str] = mapped_column(SAText, nullable=False)
@@ -48,7 +48,7 @@ class TextChunk(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     text_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("texts.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True), ForeignKey("texts.id", ondelete="CASCADE"), nullable=False, index=True
     )
     index: Mapped[int] = mapped_column(Integer, nullable=False)
     word_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -64,7 +64,7 @@ class Sentence(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     chunk_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("text_chunks.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True), ForeignKey("text_chunks.id", ondelete="CASCADE"), nullable=False, index=True
     )
     index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(SAText, nullable=False)
@@ -83,7 +83,7 @@ class TranslationSentence(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     text_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("texts.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True), ForeignKey("texts.id", ondelete="CASCADE"), nullable=False, index=True
     )
     index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(SAText, nullable=False)
@@ -101,10 +101,10 @@ class SentenceTranslationLink(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     english_sentence_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sentences.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True), ForeignKey("sentences.id", ondelete="CASCADE"), nullable=False, index=True
     )
     translation_sentence_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("translation_sentences.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True), ForeignKey("translation_sentences.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
     english_sentence: Mapped["Sentence"] = relationship(back_populates="translation_links")

@@ -13,15 +13,15 @@ class TypingSession(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     # Null for a Weak Words review session, which draws sentences from across the
     # user's whole library rather than belonging to one text/chunk.
     text_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("texts.id", ondelete="CASCADE"), nullable=True
+        UUID(as_uuid=True), ForeignKey("texts.id", ondelete="CASCADE"), nullable=True, index=True
     )
     chunk_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("text_chunks.id", ondelete="CASCADE"), nullable=True
+        UUID(as_uuid=True), ForeignKey("text_chunks.id", ondelete="CASCADE"), nullable=True, index=True
     )
     # Only set for a review session: the exact (real) sentence ids it was built from,
     # so vocabulary encounters can be recomputed at finish time.
@@ -43,14 +43,14 @@ class TypingError(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("typing_sessions.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True), ForeignKey("typing_sessions.id", ondelete="CASCADE"), nullable=False, index=True
     )
     expected_char: Mapped[str] = mapped_column(String(8), nullable=False)
     typed_char: Mapped[str] = mapped_column(String(8), nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     word: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     sentence_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sentences.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True), ForeignKey("sentences.id", ondelete="SET NULL"), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
