@@ -35,6 +35,8 @@ services:
     build:
       context: ./backend
     env_file: .env
+    ports:
+      - "8000:8000"
     volumes:
       - dictation_audio_cache:/app/audio_cache
     depends_on:
@@ -74,6 +76,8 @@ services:
     build:
       context: ./frontend
     env_file: .env
+    ports:
+      - "3000:3000"
     depends_on:
       - backend
     healthcheck:

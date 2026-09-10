@@ -405,7 +405,8 @@
 
 ## FASE 6 — DEVOPS Y PRODUCCIÓN (P1 / P2)
 
-### [ ] Tarea 6.1: Configurar y activar ESLint en Frontend
+### [x] Tarea 6.1: Configurar y activar ESLint en Frontend
+> ✅ **Completado 2026-09-10.** Creado `frontend/.eslintrc.json` con `{"extends": "next/core-web-vitals"}` (no existía ningún archivo de config antes, de ahí que estuviera "roto"). Antes de tocar `next.config.js` corrí `npm run lint` para ver qué aparecía: **cero errores y cero warnings** en todo el código existente -- buena señal de que el código ya era limpio pese a nunca haberse linteado. Retiré `eslint: { ignoreDuringBuilds: true }` de `next.config.js`. Verificado con `docker compose build frontend`: el log ahora dice explícitamente "Linting and checking validity of types..." (antes solo decía "Checking validity of types...", confirmando que ESLint no corría) y el build sigue pasando limpio.
 - **Prioridad:** P2
 - **Área:** DevOps & Calidad
 - **Archivos afectados:**
@@ -420,7 +421,8 @@
 
 ---
 
-### [ ] Tarea 6.2: Ejecución de contenedores sin privilegios de root
+### [x] Tarea 6.2: Ejecución de contenedores sin privilegios de root
+> ✅ **Completado 2026-09-10.** `backend/Dockerfile`: crea `appuser` (UID 1000), prepara `/app/audio_cache` y hace `chown -R appuser:appuser /app` antes de `USER appuser`. `frontend/Dockerfile`: activa el usuario `node` (ya viene en la imagen base `node:20-alpine`) en el stage `dev` (con `chown -R node:node /app` después del `COPY . .`) y en el stage `runtime` (usando `COPY --chown=node:node` en los tres `COPY --from=build`). El riesgo real no obvio: el volumen nombrado `dictation_audio_cache` y los volúmenes anónimos de `/app/node_modules`/`/app/.next` del frontend ya existían de sesiones anteriores corriendo como root -- cambiar a un usuario no-root sin resetearlos hubiera roto la escritura a esos paths silenciosamente (permission denied) la primera vez que la app intentara cachear audio o compilar en modo dev. Antes de recrear los contenedores: borré el volumen nombrado `mch-english_dictation_audio_cache` (es un cache puro, se regenera solo) y levanté con `docker compose up --renew-anon-volumes` para forzar volúmenes anónimos nuevos en el frontend -- sin tocar `postgres_data` en ningún momento (ese sí es data real, nunca se toca). Verificado: `docker exec mch-english-backend-1 whoami` → `appuser`, `docker exec mch-english-frontend-1 whoami` → `node` (el criterio de aceptación exacto de la tarea); `ls -la` confirma que `/app/audio_cache` y `/app/.next` quedan con el dueño correcto; `pytest` completo (76/76) corriendo ya como `appuser`; y de punta a punta via `curl` real: registro, creación de texto, Smart Chunking, y una síntesis de audio de Dictation que efectivamente escribió el `.wav` en el volumen reseteado con el dueño `appuser` -- confirma que ninguna funcionalidad existente se rompió por el cambio de usuario.
 - **Prioridad:** P1
 - **Área:** DevOps & Seguridad
 - **Archivos afectados:**
@@ -439,7 +441,8 @@
 
 ---
 
-### [ ] Tarea 6.3: Implementar Healthchecks profundos y puertos unificados
+### [x] Tarea 6.3: Implementar Healthchecks profundos y puertos unificados
+> ✅ **Completado 2026-09-10.** `/health` en `main.py` ahora ejecuta `SELECT 1` real contra la base (via la misma dependencia `get_db` que usa el resto de la API) y un `PING` real a Redis con `redis.asyncio` (no bloqueante, a diferencia de reusar el cliente sync que ya usa el worker de RQ); si cualquiera de los dos falla, responde `503` con el detalle de qué falló (`{"status": "unavailable", "checks": {"database": bool, "redis": bool}}`) en vez de devolver `200 ok` a ciegas como antes. `docker-compose.yml` (base) gana `ports: ["8000:8000"]` en `backend` y `["3000:3000"]` en `frontend` -- antes `docker compose up` sin ningún override dejaba la app completamente inalcanzable desde el host. Como consecuencia, esos mismos mapeos en `docker-compose.prod.yml` quedaron duplicados (ya los hereda de la base) y los saqué de ahí para no tener la misma config en dos lugares; `docker-compose.dev.yml` no se tocó (sus mapeos extra de postgres/redis siguen siendo comodidad de desarrollo, no deben existir en producción). Verificado de punta a punta contra el stack real, no solo con mocks: confirmé con `docker compose -f docker-compose.yml config` que el archivo base solo ya resuelve los puertos publicados; con la app corriendo hice `docker compose stop redis` → `curl /health` devolvió `503` con `redis:false`, reinicié Redis → volvió a `200`; repetí lo mismo deteniendo y reiniciando `postgres` con idéntico resultado; y confirmé que todo el stack queda `healthy` otra vez después de ambos ciclos. Tambien reescribí `test_health.py` con 3 casos (antes tenía 1 que solo comprobaba el 200 plano): el camino feliz, base de datos caída (via `dependency_overrides` con un mock que lanza excepción) y Redis caído (apuntando `app_settings.redis_url` a un puerto sin nada escuchando) -- tuve que migrar el archivo del `TestClient` síncrono original al fixture `client` async del resto de la suite, porque mezclar ambos en la misma sesión de tests producía el mismo error de "conexión atada a otro event loop" que ya había resuelto en la Tarea 5.2, esta vez por el propio `TestClient` usando su loop interno en vez del loop compartido de la sesión. `pytest` completo: **78/78 pasando** (76 previos + 2 netos nuevos de health, reemplazando el único test anterior).
 - **Prioridad:** P2
 - **Área:** DevOps & Monitoreo
 - **Archivos afectados:**
@@ -454,7 +457,8 @@
 
 ---
 
-### [ ] Tarea 6.4: Pipeline de Integración Continua (CI) en GitHub Actions
+### [x] Tarea 6.4: Pipeline de Integración Continua (CI) en GitHub Actions
+> ✅ **Completado 2026-09-10.** Nuevo `.github/workflows/ci.yml` con 3 jobs, corriendo en cada push/PR a `main` (mas `workflow_dispatch` para disparo manual, y `concurrency` para cancelar una corrida vieja si llega un push nuevo a la misma rama/PR): **frontend** (`npm ci`, `npm run lint`, `npx tsc --noEmit`, `npm run test`), **backend** (levanta Postgres 16 y Redis 7 como `services:` del job -- necesarios de verdad porque los tests de integración de la Tarea 5.2 pegan contra una base Postgres real, no una fake --, corre `alembic upgrade head` para verificar que TODO el historial de migraciones aplica limpio contra una base recién creada -- no solo contra la base de dev ya migrada --, y despues `pytest`) y **docker-build** (`docker build` de ambos Dockerfiles, depende de que los otros dos jobs pasen primero para no gastar minutos de CI si ya fallaron). No pude disparar una corrida real de GitHub Actions desde acá (esta sesión no tiene forma de ejecutar el runner de GitHub ni ver el resultado en la pestaña Actions del repo), así que en su lugar verifiqué cada paso individualmente contra infraestructura real equivalente a la que usaría el pipeline: `npx tsc --noEmit` corrido directo (no a través de `next build`) sin errores; y sobre todo, cree una base Postgres nueva y vacía (`mch_english_ci_check`, sin ninguna relación con la base de dev ya migrada) y corrí `alembic upgrade head` contra ella desde cero -- las 11 migraciones del historial completo del proyecto aplicaron sin errores, confirmando que un checkout limpio de CI migraría igual de bien -- y borré esa base de verificación al terminar. El resto de los pasos (`npm run lint`, `npm run test`, `pytest`, los `docker build` de ambos Dockerfiles) ya estaban verificados en las tareas 5.1/5.2/6.1/6.2 de esta misma sesión con exactamente los mismos comandos que usa el workflow. La verificación real de "el pipeline corre exitosamente en GitHub" (el criterio de aceptación literal) queda pendiente de la primera vez que esto se pushee y se abra un PR o se vea correr en la pestaña Actions -- documentado explícitamente como la única parte de esta tarea que no pude confirmar yo mismo.
 - **Prioridad:** P2
 - **Área:** DevOps / CI-CD
 - **Archivos afectados:**

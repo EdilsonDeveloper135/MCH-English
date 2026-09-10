@@ -1,7 +1,13 @@
-from fastapi import FastAPI
+import redis.asyncio as aioredis
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text as sql_text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import auth, dictation, dictionary, gamification, recall, sessions, settings, statistics, texts, vocabulary
+from app.core.config import settings as app_settings
+from app.core.database import get_db
 
 app = FastAPI(title="MCH-English API")
 
@@ -26,5 +32,25 @@ app.include_router(gamification.router, prefix="/gamification", tags=["gamificat
 
 
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+async def health(db: AsyncSession = Depends(get_db)):
+    checks = {"database": False, "redis": False}
+
+    try:
+        await db.execute(sql_text("SELECT 1"))
+        checks["database"] = True
+    except Exception:  # noqa: BLE001 - a health check must never itself crash
+        pass
+
+    try:
+        redis_client = aioredis.from_url(app_settings.redis_url)
+        try:
+            await redis_client.ping()
+            checks["redis"] = True
+        finally:
+            await redis_client.aclose()
+    except Exception:  # noqa: BLE001
+        pass
+
+    if not all(checks.values()):
+        return JSONResponse(status_code=503, content={"status": "unavailable", "checks": checks})
+    return {"status": "ok", "checks": checks}
