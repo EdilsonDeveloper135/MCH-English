@@ -1,4 +1,3 @@
-import re
 import uuid
 from datetime import datetime, timezone
 
@@ -107,35 +106,37 @@ async def build_weak_words_sentences(
     max_per_word: int = 2,
 ) -> list[Sentence]:
     """Picks real sentences from the user's own library that contain the given words --
-    no synthetic/generated content, per the product's no-AI stance."""
+    no synthetic/generated content, per the product's no-AI stance. Filters with one
+    query per word directly in Postgres (word-boundary regex, `\\y` is the Postgres
+    ARE equivalent of PCRE's `\\b`) instead of loading the user's entire library into
+    Python and scanning it there -- words only ever come from extract_words'
+    [A-Za-z0-9']+ token set, which contains no regex metacharacters in either dialect,
+    so no escaping is needed."""
     if not words:
         return []
-
-    result = await db.execute(
-        select(Sentence)
-        .join(TextChunk, Sentence.chunk_id == TextChunk.id)
-        .join(Text, TextChunk.text_id == Text.id)
-        .where(Text.user_id == user_id)
-    )
-    all_sentences = list(result.scalars().all())
 
     selected: list[Sentence] = []
     selected_ids: set[uuid.UUID] = set()
 
     for word in words:
-        if len(selected) >= max_sentences:
+        remaining = max_sentences - len(selected)
+        if remaining <= 0:
             break
-        pattern = re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
-        matches_for_word = 0
-        for sentence in all_sentences:
-            if len(selected) >= max_sentences or matches_for_word >= max_per_word:
-                break
-            if sentence.id in selected_ids:
-                continue
-            if pattern.search(sentence.content):
-                selected.append(sentence)
-                selected_ids.add(sentence.id)
-                matches_for_word += 1
+
+        query = (
+            select(Sentence)
+            .join(TextChunk, Sentence.chunk_id == TextChunk.id)
+            .join(Text, TextChunk.text_id == Text.id)
+            .where(Text.user_id == user_id, Sentence.content.op("~*")(rf"\y{word}\y"))
+        )
+        if selected_ids:
+            query = query.where(Sentence.id.not_in(selected_ids))
+        query = query.limit(min(max_per_word, remaining))
+
+        result = await db.execute(query)
+        for sentence in result.scalars().all():
+            selected.append(sentence)
+            selected_ids.add(sentence.id)
 
     return selected
 

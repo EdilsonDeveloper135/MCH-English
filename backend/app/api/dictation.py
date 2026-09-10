@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import datetime, timezone
 
@@ -49,14 +50,16 @@ async def get_audio(
     cached = result.scalar_one_or_none()
 
     if cached is not None:
-        audio_bytes = tts_service.read_cached_audio(sentence_id)
+        audio_bytes = await asyncio.to_thread(tts_service.read_cached_audio, sentence_id)
         if audio_bytes is not None:
             return Response(content=audio_bytes, media_type="audio/wav")
         # Row exists but the file is gone (e.g. the volume was wiped independently of
         # the DB) -- fall through and resynthesize/rewrite instead of 500ing.
 
-    audio_bytes = tts_service.synthesize(sentence.content)
-    tts_service.write_cached_audio(sentence_id, audio_bytes)
+    # subprocess.run + disk I/O are blocking calls -- run them off the event loop so
+    # one slow synthesis doesn't stall every other concurrent request being served.
+    audio_bytes = await asyncio.to_thread(tts_service.synthesize, sentence.content)
+    await asyncio.to_thread(tts_service.write_cached_audio, sentence_id, audio_bytes)
     # Race-safe: two concurrent first-requests for the same sentence would both
     # synthesize (wasteful but harmless, and deterministic -- eSpeak-NG produces
     # identical bytes for the same input) and both write the file and try to insert

@@ -131,10 +131,17 @@ export default function PracticePage() {
       if (!sessionId || !text || !chunk) return;
       const finished = await api.finishSession(sessionId, stats);
       setChunkSummary({ wpm: finished.wpm, accuracy: finished.accuracy });
-      await api.updateProgress(text.id, chunk.index + 1, 0);
+      const updatedText = await api.updateProgress(text.id, chunk.index + 1, 0);
+      setText(updatedText);
     },
     [sessionId, text, chunk]
   );
+
+  const handleContinue = useCallback(() => {
+    setChunkSummary(null);
+    setSessionId(null);
+    if (text) loadChunk(text);
+  }, [text, loadChunk]);
 
   const initialIndex = text && chunk && text.current_chunk_index === chunk.index ? text.current_character_index : 0;
 
@@ -254,11 +261,7 @@ export default function PracticePage() {
         </div>
 
         {isChunkDone && chunkSummary ? (
-          <ChunkCompleteSummary
-            wpm={chunkSummary.wpm}
-            accuracy={chunkSummary.accuracy}
-            onContinue={() => window.location.reload()}
-          />
+          <ChunkCompleteSummary wpm={chunkSummary.wpm} accuracy={chunkSummary.accuracy} onContinue={handleContinue} />
         ) : (
           <>
             <TypingText targetText={targetText} charStates={charStates} currentIndex={currentIndex} />

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/authStore";
-import { api, ApiError } from "@/services/api";
+import { api } from "@/services/api";
 import type { VocabularyItemDTO } from "@/types";
 
 export default function VocabularyPage() {
@@ -13,8 +13,6 @@ export default function VocabularyPage() {
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
 
   const [items, setItems] = useState<VocabularyItemDTO[] | null>(null);
-  const [starting, setStarting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -25,21 +23,10 @@ export default function VocabularyPage() {
     api.getVocabulary().then(setItems);
   }, [hasHydrated, token, router]);
 
-  async function handlePracticeWeak() {
-    setError(null);
-    setStarting(true);
-    try {
-      await api.startWeakWordsSession();
-      router.push("/practice/weak-words");
-    } catch (err) {
-      setError(
-        err instanceof ApiError && err.status === 404
-          ? "Todavia no hay suficientes palabras debiles registradas. Segui practicando textos primero."
-          : "No se pudo iniciar la practica."
-      );
-    } finally {
-      setStarting(false);
-    }
+  function handlePracticeWeak() {
+    // /practice/weak-words creates its own session on mount -- creating one here too
+    // would leave a second, orphaned session behind every time this button is used.
+    router.push("/practice/weak-words");
   }
 
   return (
@@ -58,12 +45,10 @@ export default function VocabularyPage() {
 
       <button
         onClick={handlePracticeWeak}
-        disabled={starting}
-        className="bg-white text-black rounded px-4 py-2 text-sm font-medium disabled:opacity-50 mb-4"
+        className="bg-white text-black rounded px-4 py-2 text-sm font-medium mb-4"
       >
-        {starting ? "Preparando..." : "Practicar palabras debiles"}
+        Practicar palabras debiles
       </button>
-      {error && <p className="text-red-500 text-sm mb-6">{error}</p>}
 
       {!items ? (
         <p className="text-gray-500 text-sm">Cargando...</p>

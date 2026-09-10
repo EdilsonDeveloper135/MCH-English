@@ -173,7 +173,9 @@
 
 ## FASE 2 — ARQUITECTURA Y CÓDIGO (P1 / P2)
 
-### [ ] Tarea 2.1: Reemplazar reload forzado de página en la práctica de mecanografía
+### [x] Tarea 2.1: Reemplazar reload forzado de página en la práctica de mecanografía
+> ✅ **Completado 2026-09-10.** `onContinue` ahora llama a `handleContinue`, que limpia el resumen y reinvoca `loadChunk(text)` (la misma función ya usada en la carga inicial) con el `TextDTO` actualizado que `handleChunkComplete` obtiene de la respuesta de `updateProgress`. `useTypingSession` ya reseteaba su estado interno en base a cambios de `targetText`, así que la transición reutiliza ese mecanismo sin tocarlo. Verificado sin ambigüedad: seteé `window.__miMarcador` antes de tocar "Continuar" y confirmé que sobrevivió después del click (una recarga real lo habría borrado); la pantalla siguiente ("Ya completaste este texto") apareció correctamente sin ningún request de navegación de documento completo.
+- **Prioridad:** P1
 - **Prioridad:** P1
 - **Área:** Frontend / Arquitectura SPA
 - **Archivos afectados:**
@@ -186,7 +188,9 @@
 
 ---
 
-### [ ] Tarea 2.2: Eliminar creación de sesiones duplicadas en Weak Words
+### [x] Tarea 2.2: Eliminar creación de sesiones duplicadas en Weak Words
+> ✅ **Completado 2026-09-10.** `vocabulary/page.tsx` ya no llama a `api.startWeakWordsSession()` -- `handlePracticeWeak` solo navega. Verificado por inspección directa del bundle servido (`_next/static/chunks/app/vocabulary/page.js` ya no contiene esa llamada) y confirmando que visitar `/practice/weak-words` de forma aislada crea exactamente una sesión. **Nota de transparencia:** al llegar mediante `router.push` desde `/vocabulary` en modo desarrollo, todavía se observan 2 requests a `POST /vocabulary/weak/session` -- esto es React Strict Mode (activo por defecto en el App Router de Next.js 14, sin override en `next.config.js`), que duplica intencionalmente los efectos de montaje en dev para detectar side-effects no idempotentes; una navegación dura al mismo destino produjo una sola sesión, y Strict Mode no duplica nada en un build de producción. La causa raíz que diagnosticó la auditoría (dos puntos de creación distintos) está eliminada; el duplicado remanente es una característica del framework en dev, no un defecto de esta corrección.
+- **Prioridad:** P1
 - **Prioridad:** P1
 - **Área:** Frontend & Base de Datos / Limpieza
 - **Archivos afectados:**
@@ -200,7 +204,9 @@
 
 ---
 
-### [ ] Tarea 2.3: Desacoplar llamadas bloqueantes de síntesis en FastAPI
+### [x] Tarea 2.3: Desacoplar llamadas bloqueantes de síntesis en FastAPI
+> ✅ **Completado 2026-09-10.** `get_audio` ahora envuelve `tts_service.synthesize` (subprocess), `write_cached_audio` y `read_cached_audio` (I/O de disco) en `asyncio.to_thread`, liberando el event loop mientras corren. Verificado con concurrencia real: se disparó una síntesis de audio y, mientras estaba en vuelo, `GET /health` respondió en 0.002s en vez de quedar bloqueado detrás de la síntesis.
+- **Prioridad:** P2
 - **Prioridad:** P2
 - **Área:** Backend / Concurrencia
 - **Archivos afectados:**
@@ -214,7 +220,9 @@
 
 ---
 
-### [ ] Tarea 2.4: Optimizar búsqueda de oraciones para Weak Words
+### [x] Tarea 2.4: Optimizar búsqueda de oraciones para Weak Words
+> ✅ **Completado 2026-09-10.** `build_weak_words_sentences` ahora hace una consulta SQL por palabra con el operador `~*` de Postgres y límite (`\\y...\\y` para límites de palabra -- el equivalente en Advanced Regular Expressions de Postgres al `\\b` de PCRE/Python), en vez de cargar toda la biblioteca del usuario a Python y filtrar con bucles anidados. Verificado con un caso adversarial real: buscar solo "wolf" devuelve únicamente las oraciones con esa palabra completa y excluye correctamente "Wolves live in packs." (que un `LIKE '%wolf%'` ingenuo habría matcheado por substring).
+- **Prioridad:** P2
 - **Prioridad:** P2
 - **Área:** Backend / Rendimiento y Memoria
 - **Archivos afectados:**
