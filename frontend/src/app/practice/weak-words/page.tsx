@@ -21,7 +21,7 @@ export default function WeakWordsPracticePage() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [session, setSession] = useState<WeakWordsSessionDTO | null>(null);
   const [done, setDone] = useState<{ wpm: number; accuracy: number } | null>(null);
-  const [errorWord, setErrorWord] = useState<string | null>(null);
+  const [errorWordInfo, setErrorWordInfo] = useState<{ word: string; position: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export default function WeakWordsPracticePage() {
 
   const { text: targetText, sentenceRanges } = session ? buildTargetText(session.sentences) : { text: "", sentenceRanges: [] };
 
-  const handleWordError = useCallback((word: string) => setErrorWord(word), []);
+  const handleWordError = useCallback((word: string, position: number) => setErrorWordInfo({ word, position }), []);
 
   const handleComplete = useCallback(
     async (stats: ChunkCompleteStats) => {
@@ -52,7 +52,7 @@ export default function WeakWordsPracticePage() {
     [session]
   );
 
-  const { charStates, currentIndex, handleKeyDown, handleInput, liveWpm, liveAccuracy } = useTypingSession({
+  const { charStates, currentIndex, extraChars, handleKeyDown, handleInput, liveWpm, liveAccuracy } = useTypingSession({
     targetText,
     sentenceRanges,
     onComplete: handleComplete,
@@ -99,11 +99,16 @@ export default function WeakWordsPracticePage() {
             </button>
           </div>
         ) : (
-          <TypingText targetText={targetText} charStates={charStates} currentIndex={currentIndex} />
+          <TypingText
+            targetText={targetText}
+            charStates={charStates}
+            currentIndex={currentIndex}
+            extraChars={extraChars}
+          />
         )}
       </div>
 
-      <WordHelpTooltip word={errorWord} />
+      <WordHelpTooltip word={errorWordInfo?.word ?? null} activeCharIndex={errorWordInfo?.position} />
     </div>
   );
 }

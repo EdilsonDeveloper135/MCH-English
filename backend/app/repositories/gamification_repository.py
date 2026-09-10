@@ -2,7 +2,9 @@ import uuid
 from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from app.models.dictation import DictationAttempt, DictationSession
 from app.models.gamification import UserAchievement
@@ -123,6 +125,13 @@ async def get_unlocked_achievement_ids(db: AsyncSession, user_id: uuid.UUID) -> 
 
 
 async def unlock_achievements(db: AsyncSession, user_id: uuid.UUID, achievement_ids: list[str]) -> None:
+    if not achievement_ids:
+        return
     for achievement_id in achievement_ids:
-        db.add(UserAchievement(user_id=user_id, achievement_id=achievement_id))
+        stmt = (
+            pg_insert(UserAchievement)
+            .values(user_id=user_id, achievement_id=achievement_id)
+            .on_conflict_do_nothing(index_elements=["user_id", "achievement_id"])
+        )
+        await db.execute(stmt)
     await db.commit()

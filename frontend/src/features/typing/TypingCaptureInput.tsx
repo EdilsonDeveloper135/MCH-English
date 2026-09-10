@@ -30,7 +30,7 @@ export function TypingCaptureInput({ inputRef, onKeyDown, onInput }: TypingCaptu
       spellCheck={false}
       onKeyDown={onKeyDown}
       onInput={onInput}
-      onBlur={() => inputRef.current?.focus()}
     />
   );
 }
+

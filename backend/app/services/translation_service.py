@@ -1,3 +1,5 @@
+import asyncio
+
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,9 +37,10 @@ async def realign_translation(db: AsyncSession, text: Text) -> None:
     db.add_all(translation_sentences)
     await db.flush()
 
-    beads = align([s.content for s in english_sentences], spanish_contents)
+    beads = await asyncio.to_thread(align, [s.content for s in english_sentences], spanish_contents)
 
     for bead in beads:
+
         for en_idx in bead.english_indices:
             for es_idx in bead.spanish_indices:
                 db.add(

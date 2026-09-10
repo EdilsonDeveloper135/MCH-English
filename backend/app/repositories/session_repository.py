@@ -93,16 +93,11 @@ async def overview_for_user(db: AsyncSession, user_id: uuid.UUID) -> dict:
             func.coalesce(func.avg(TypingSession.accuracy), 0),
             func.coalesce(func.max(TypingSession.wpm), 0),
             func.coalesce(func.sum(TypingSession.incorrect_characters), 0),
+            func.coalesce(func.sum(TypingSession.duration_seconds), 0),
         ).where(TypingSession.user_id == user_id, TypingSession.finished_at.is_not(None))
     )
-    total_sessions, avg_wpm, avg_accuracy, best_wpm, total_errors = result.one()
+    total_sessions, avg_wpm, avg_accuracy, best_wpm, total_errors, total_seconds = result.one()
 
-    duration_result = await db.execute(
-        select(func.coalesce(func.sum(TypingSession.duration_seconds), 0)).where(
-            TypingSession.user_id == user_id, TypingSession.finished_at.is_not(None)
-        )
-    )
-    total_seconds = duration_result.scalar_one()
 
     current_wpm_result = await db.execute(
         select(TypingSession.wpm)

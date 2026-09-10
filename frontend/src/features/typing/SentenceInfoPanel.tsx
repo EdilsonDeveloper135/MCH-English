@@ -61,7 +61,11 @@ export function SentenceInfoPanel({
 
   return (
     <div className="mt-4 text-sm">
-      <button onClick={() => setExpanded((e) => !e)} className="text-gray-400 underline text-xs">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="text-gray-400 underline text-xs focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none rounded px-1"
+      >
         {expanded ? "Ocultar detalles" : hasContent ? "Ver detalles" : "Agregar detalles"}
       </button>
 
@@ -92,9 +96,15 @@ export function SentenceInfoPanel({
                   value={noteDraft}
                   onChange={(e) => setNoteDraft(e.target.value)}
                   placeholder="ej: require + noun"
-                  className="flex-1 bg-gray-900 border border-gray-800 rounded px-2 py-1 text-white text-xs"
+                  className="flex-1 bg-gray-900 border border-gray-800 rounded px-2 py-1 text-white text-xs focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
                 />
-                <button onClick={saveNote} disabled={saving} className="text-xs underline text-white">
+                <button
+                  type="button"
+                  onClick={saveNote}
+                  disabled={saving}
+                  aria-label="Guardar nota"
+                  className="text-xs underline text-white px-2 py-1 rounded focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+                >
                   Guardar
                 </button>
               </div>
@@ -102,11 +112,12 @@ export function SentenceInfoPanel({
               <div className="flex items-center gap-2">
                 <p className="text-gray-400 text-xs">{sentence.grammar_note ?? "Sin nota."}</p>
                 <button
+                  type="button"
                   onClick={() => {
                     setNoteDraft(sentence.grammar_note ?? "");
                     setEditingNote(true);
                   }}
-                  className="text-xs underline text-gray-400"
+                  className="text-xs underline text-gray-400 px-1 rounded focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
                 >
                   Editar
                 </button>
@@ -123,7 +134,12 @@ export function SentenceInfoPanel({
                     <span>
                       {p.english_phrase} = {p.spanish_phrase}
                     </span>
-                    <button onClick={() => removePhrase(p.id)} className="text-gray-400 hover:text-red-500">
+                    <button
+                      type="button"
+                      onClick={() => removePhrase(p.id)}
+                      aria-label="Eliminar frase"
+                      className="text-gray-400 hover:text-red-500 px-1.5 py-0.5 rounded focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+                    >
                       x
                     </button>
                   </li>
@@ -140,7 +156,7 @@ export function SentenceInfoPanel({
                   value={englishDraft}
                   onChange={(e) => setEnglishDraft(e.target.value)}
                   placeholder="ingles"
-                  className="flex-1 bg-gray-900 border border-gray-800 rounded px-2 py-1 text-white text-xs"
+                  className="flex-1 bg-gray-900 border border-gray-800 rounded px-2 py-1 text-white text-xs focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
                 />
                 <label htmlFor={`phrase-es-${sentence.id}`} className="sr-only">
                   Frase en espanol
@@ -150,14 +166,24 @@ export function SentenceInfoPanel({
                   value={spanishDraft}
                   onChange={(e) => setSpanishDraft(e.target.value)}
                   placeholder="espanol"
-                  className="flex-1 bg-gray-900 border border-gray-800 rounded px-2 py-1 text-white text-xs"
+                  className="flex-1 bg-gray-900 border border-gray-800 rounded px-2 py-1 text-white text-xs focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
                 />
-                <button onClick={addPhrase} disabled={saving} className="text-xs underline text-white">
+                <button
+                  type="button"
+                  onClick={addPhrase}
+                  disabled={saving}
+                  aria-label="Guardar frase"
+                  className="text-xs underline text-white px-2 py-1 rounded focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+                >
                   +
                 </button>
               </div>
             ) : (
-              <button onClick={() => setShowAddPhrase(true)} className="text-xs underline text-gray-400">
+              <button
+                type="button"
+                onClick={() => setShowAddPhrase(true)}
+                className="text-xs underline text-gray-400 px-1 rounded focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+              >
                 + Agregar frase
               </button>
             )}

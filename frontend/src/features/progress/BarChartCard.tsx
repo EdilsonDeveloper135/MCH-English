@@ -35,17 +35,25 @@ function Chart({ bars, unit }: { bars: Bar[]; unit: string }) {
   const barWidth = Math.min(slot * 0.6, 48);
 
   return (
-    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full h-40" preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full h-40">
       {bars.map((b, i) => {
         const barHeight = (b.value / max) * (HEIGHT - PAD * 2 - 12);
         const x = PAD + i * slot + (slot - barWidth) / 2;
         const y = HEIGHT - PAD - 12 - barHeight;
         return (
           <g key={i}>
-            <rect x={x} y={y} width={barWidth} height={Math.max(barHeight, 1)} fill="#fff">
+            <rect
+              x={x}
+              y={y}
+              width={barWidth}
+              height={Math.max(barHeight, 1)}
+              fill="#fff"
+              className="rx-sm"
+              vectorEffect="non-scaling-stroke"
+            >
               <title>{`${b.label}: ${b.value}${unit}`}</title>
             </rect>
-            <text x={x + barWidth / 2} y={HEIGHT - PAD} fontSize="9" fill="#6b7280" textAnchor="middle">
+            <text x={x + barWidth / 2} y={HEIGHT - PAD + 2} fontSize="10" fill="#9ca3af" textAnchor="middle" className="font-mono select-none">
               {b.label}
             </text>
           </g>

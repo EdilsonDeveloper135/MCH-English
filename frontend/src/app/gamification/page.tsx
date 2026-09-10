@@ -17,11 +17,21 @@ export default function GamificationPage() {
   const [overview, setOverview] = useState<GamificationOverviewDTO | null>(null);
   const [goalDraft, setGoalDraft] = useState("");
   const [savingGoal, setSavingGoal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Swallowed: a failed fetch (e.g. an expired token, already handled by api.ts's
-  // 401 interceptor redirecting to /login) just leaves this page loading forever
-  // instead of surfacing as an unhandled promise rejection.
-  const refresh = () => api.getGamificationOverview().then(setOverview).catch(() => {});
+  const refresh = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.getGamificationOverview();
+      setOverview(data);
+    } catch {
+      setError("No se pudo cargar la información de gamificación.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -49,7 +59,18 @@ export default function GamificationPage() {
     <div className="min-h-screen px-6 py-10 max-w-3xl mx-auto">
       <h1 className="text-xl font-semibold text-white mb-8">Gamification</h1>
 
-      {!overview ? (
+      {error ? (
+        <div className="bg-red-950/40 border border-red-900/60 rounded-xl p-6 text-center my-8">
+          <p className="text-red-300 text-sm mb-4">{error}</p>
+          <button
+            type="button"
+            onClick={refresh}
+            className="bg-white text-black text-xs font-semibold px-4 py-2 rounded-lg hover:bg-neutral-200 transition-colors focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+          >
+            Reintentar conexión
+          </button>
+        </div>
+      ) : loading || !overview ? (
         <p className="text-gray-400 text-sm">Cargando...</p>
       ) : (
         <div className="space-y-8">

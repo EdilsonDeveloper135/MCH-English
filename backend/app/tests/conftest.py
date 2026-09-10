@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 # used throughout the app (pg_insert/on_conflict, the `~*` regex operator) rule out
 # an in-memory SQLite substitute, so this uses a real, throwaway Postgres database
 # instead, never the dev database itself.
-_BASE_DATABASE_URL = os.environ["DATABASE_URL"]
+_BASE_DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@postgres:5432/mch_english")
 _TEST_DATABASE_URL = _BASE_DATABASE_URL.rsplit("/", 1)[0] + "/mch_english_test"
 os.environ["DATABASE_URL"] = _TEST_DATABASE_URL
 
@@ -26,43 +26,41 @@ def _admin_database_url() -> str:
 
 
 import app.models  # noqa: E402  (registers every model on Base.metadata before create_all)
-from app.core.database import Base, engine  # noqa: E402
-from app.main import app as fastapi_app  # noqa: E402
+import app.core.database  # noqa: E402
+from sqlalchemy.pool import NullPool  # noqa: E402
+from sqlalchemy.ext.asyncio import async_sessionmaker  # noqa: E402
+from app.core.config import settings as app_settings  # noqa: E402
+from app.core.database import Base  # noqa: E402
+
+# Replace engine in test process with NullPool to prevent loop attachment errors across tests
+test_engine = create_async_engine(_TEST_DATABASE_URL, echo=False, poolclass=NullPool)
+app.core.database.engine = test_engine
+app.core.database.async_session_maker = async_sessionmaker(test_engine, expire_on_commit=False)
+engine = test_engine
+
+from app.main import app as fastapi_app, limiter  # noqa: E402
+
+# Disable rate limiter during general tests to prevent 429 on repetitive test requests
+app_settings.rate_limit_enabled = False
+limiter.enabled = False
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    # SQLAlchemy's async engine pools real asyncpg connections, and a connection
-    # created on one event loop cannot be reused on another -- pytest-asyncio's
-    # default is a fresh loop per test function, which would make every test after
-    # the first fail with "another operation is in progress" the moment it touches
-    # a pooled connection handed out on a now-dead loop. One shared loop for the
-    # whole session keeps the engine's pool valid throughout, matching how the app
-    # actually runs in production (a single long-lived event loop under uvicorn).
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _setup_test_database():
+    admin_engine = create_async_engine(_admin_database_url(), isolation_level="AUTOCOMMIT")
+    try:
+        async with admin_engine.connect() as conn:
+            await conn.execute(sql_text("DROP DATABASE IF EXISTS mch_english_test"))
+            await conn.execute(sql_text("CREATE DATABASE mch_english_test"))
+    finally:
+        await admin_engine.dispose()
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    await engine.dispose()
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _setup_test_database():
-    async def _run():
-        admin_engine = create_async_engine(_admin_database_url(), isolation_level="AUTOCOMMIT")
-        try:
-            async with admin_engine.connect() as conn:
-                await conn.execute(sql_text("DROP DATABASE IF EXISTS mch_english_test"))
-                await conn.execute(sql_text("CREATE DATABASE mch_english_test"))
-        finally:
-            await admin_engine.dispose()
-
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        # Connections opened here belong to this asyncio.run()'s event loop, which
-        # is about to be torn down -- dispose so the pool starts clean in whatever
-        # loop the first real test runs in.
-        await engine.dispose()
-
-    asyncio.run(_run())
 
 
 @pytest_asyncio.fixture(autouse=True)

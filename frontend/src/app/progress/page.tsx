@@ -23,6 +23,29 @@ export default function ProgressPage() {
   const [history, setHistory] = useState<HistoryPointDTO[] | null>(null);
   const [distribution, setDistribution] = useState<VocabularyBucketDTO[] | null>(null);
   const [weakWords, setWeakWords] = useState<VocabularyItemDTO[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [s, h, d, w] = await Promise.all([
+        api.getOverview(),
+        api.getHistory(),
+        api.getVocabularyDistribution(),
+        api.getWeakWords(),
+      ]);
+      setStats(s);
+      setHistory(h);
+      setDistribution(d);
+      setWeakWords(w);
+    } catch {
+      setError("No se pudieron cargar las estadísticas de progreso.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -30,22 +53,25 @@ export default function ProgressPage() {
       router.replace("/login");
       return;
     }
-    // Swallowed: a failed fetch (e.g. an expired token, already handled by api.ts's
-    // 401 interceptor redirecting to /login) just leaves this card loading forever
-    // instead of surfacing as an unhandled promise rejection.
-    api.getOverview().then(setStats).catch(() => {});
-    api.getHistory().then(setHistory).catch(() => {});
-    api.getVocabularyDistribution().then(setDistribution).catch(() => {});
-    api.getWeakWords().then(setWeakWords).catch(() => {});
+    loadData();
   }, [hasHydrated, token, router]);
-
-  const loading = !stats || !history || !distribution || !weakWords;
 
   return (
     <div className="min-h-screen px-6 py-10 max-w-3xl mx-auto">
       <h1 className="text-xl font-semibold text-white mb-8">Progress</h1>
 
-      {loading ? (
+      {error ? (
+        <div className="bg-red-950/40 border border-red-900/60 rounded-xl p-6 text-center my-8">
+          <p className="text-red-300 text-sm mb-4">{error}</p>
+          <button
+            type="button"
+            onClick={loadData}
+            className="bg-white text-black text-xs font-semibold px-4 py-2 rounded-lg hover:bg-neutral-200 transition-colors focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+          >
+            Reintentar conexión
+          </button>
+        </div>
+      ) : loading || !stats || !history || !distribution || !weakWords ? (
         <p className="text-gray-400 text-sm">Cargando...</p>
       ) : (
         <div className="space-y-10">

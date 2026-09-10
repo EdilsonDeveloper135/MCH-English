@@ -11,10 +11,14 @@ import { TypingStats } from "@/features/typing/TypingStats";
 import { TranslationPanel } from "@/features/typing/TranslationPanel";
 import { SentenceInfoPanel } from "@/features/typing/SentenceInfoPanel";
 import { WordHelpTooltip } from "@/features/typing/WordHelpTooltip";
+import { SessionSummaryModal } from "@/features/typing/SessionSummaryModal";
+import { ZenToggle, ThemeSelector, useZenMode } from "@/features/typing/ZenToggle";
+import { AudioFeedbackSettings } from "@/features/typing/AudioFeedbackSettings";
 import {
   buildTargetText,
   findSentenceIdAt,
   useTypingSession,
+  wordAtPosition,
   type ChunkCompleteStats,
 } from "@/features/typing/useTypingSession";
 
@@ -44,11 +48,18 @@ export default function PracticePage() {
   const [text, setText] = useState<TextDTO | null>(null);
   const [chunk, setChunk] = useState<ChunkDTO | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [chunkSummary, setChunkSummary] = useState<{ wpm: number; accuracy: number } | null>(null);
+  const { zenMode, toggleZen } = useZenMode();
+  const [chunkSummary, setChunkSummary] = useState<{
+    wpm: number;
+    accuracy: number;
+    durationSeconds: number;
+    wpmHistory: number[];
+    failedWords: string[];
+  } | null>(null);
   const [translationMode, setTranslationMode] = useState<TranslationMode>("learning");
   const [lastCompletedSentenceId, setLastCompletedSentenceId] = useState<string | null>(null);
   const [revealedSentenceId, setRevealedSentenceId] = useState<string | null>(null);
-  const [errorWord, setErrorWord] = useState<string | null>(null);
+  const [errorWordInfo, setErrorWordInfo] = useState<{ word: string; position: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -126,19 +137,35 @@ export default function PracticePage() {
     [text, chunk, translationMode]
   );
 
-  const handleWordError = useCallback((word: string) => {
-    setErrorWord(word);
+  const handleWordError = useCallback((word: string, position: number) => {
+    setErrorWordInfo({ word, position });
   }, []);
 
   const handleChunkComplete = useCallback(
     async (stats: ChunkCompleteStats) => {
       if (!sessionId || !text || !chunk) return;
       const finished = await api.finishSession(sessionId, stats);
-      setChunkSummary({ wpm: finished.wpm, accuracy: finished.accuracy });
+
+      const errorWords = Array.from(
+        new Set(
+          stats.errors
+            .map((err) => wordAtPosition(targetText, err.position))
+            .filter((w): w is string => Boolean(w && w.length > 0))
+        )
+      );
+
+      setChunkSummary({
+        wpm: finished.wpm,
+        accuracy: finished.accuracy,
+        durationSeconds: stats.duration_seconds,
+        wpmHistory: stats.wpmHistory ?? [finished.wpm],
+        failedWords: errorWords,
+      });
+
       const updatedText = await api.updateProgress(text.id, chunk.index + 1, 0);
       setText(updatedText);
     },
-    [sessionId, text, chunk]
+    [sessionId, text, chunk, targetText]
   );
 
   const handleContinue = useCallback(() => {
@@ -149,7 +176,7 @@ export default function PracticePage() {
 
   const initialIndex = text && chunk && text.current_chunk_index === chunk.index ? text.current_character_index : 0;
 
-  const { charStates, currentIndex, handleKeyDown, handleInput, liveWpm, liveAccuracy } = useTypingSession({
+  const { charStates, currentIndex, extraChars, handleKeyDown, handleInput, liveWpm, liveAccuracy } = useTypingSession({
     targetText,
     sentenceRanges,
     initialIndex,
@@ -220,7 +247,6 @@ export default function PracticePage() {
   }
 
   const progressPercent = targetText.length ? (currentIndex / targetText.length) * 100 : 0;
-  const isChunkDone = currentIndex >= targetText.length && targetText.length > 0;
 
   const currentSentenceId = findSentenceIdAt(sentenceRanges, currentIndex);
   const targetSentenceId =
@@ -229,22 +255,45 @@ export default function PracticePage() {
   const isRevealed = targetSentenceId !== null && targetSentenceId === revealedSentenceId;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6">
+    <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-start md:justify-center px-4 md:px-6 pt-4 md:pt-0">
       <TypingCaptureInput inputRef={inputRef} onKeyDown={handleKeyDown} onInput={handleInput} />
 
       <div className="w-full max-w-3xl cursor-text" onClick={() => inputRef.current?.focus()}>
-        <div className="flex items-center justify-between mb-2">
+        {/* Book Context & Quick Controls Header */}
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-2 border-b border-neutral-900 text-xs">
+          <p className="text-gray-400">
+            {text?.title ? <span className="text-white font-medium">{text.title}</span> : ""}
+            {chunk && text ? (
+              <span className="text-gray-500"> · Fragmento {chunk.index + 1}/{text.chunk_count}</span>
+            ) : (
+              ""
+            )}
+          </p>
+          <div className="flex items-center gap-2">
+            <ZenToggle zenMode={zenMode} onToggle={toggleZen} />
+            <ThemeSelector />
+            <AudioFeedbackSettings />
+          </div>
+        </div>
+
+        {/* Live Typing Metrics & Translation Mode */}
+        <div
+          className={`flex items-center justify-between mb-2 transition-opacity duration-300 ${
+            zenMode ? "opacity-0 hover:opacity-100" : ""
+          }`}
+        >
           <TypingStats wpm={liveWpm} accuracy={liveAccuracy} progressPercent={progressPercent} />
           <div className="flex gap-1 text-xs">
             {MODES.map((m) => (
               <button
                 key={m.value}
+                type="button"
                 onClick={() => handleModeChange(m.value)}
-                className={
+                className={`px-2 py-1 rounded transition-colors focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none ${
                   translationMode === m.value
-                    ? "bg-white text-black rounded px-2 py-1"
-                    : "text-gray-400 hover:text-white px-2 py-1"
-                }
+                    ? "bg-white text-black font-medium"
+                    : "text-gray-400 hover:text-white"
+                }`}
               >
                 {m.label}
               </button>
@@ -252,31 +301,44 @@ export default function PracticePage() {
           </div>
         </div>
 
-        {isChunkDone && chunkSummary ? (
-          <ChunkCompleteSummary wpm={chunkSummary.wpm} accuracy={chunkSummary.accuracy} onContinue={handleContinue} />
-        ) : (
-          <>
-            <TypingText targetText={targetText} charStates={charStates} currentIndex={currentIndex} />
-            <TranslationPanel
-              translation={targetSentence?.translation ?? null}
-              mode={translationMode}
-              revealed={isRevealed}
-              onReveal={() => targetSentenceId && setRevealedSentenceId(targetSentenceId)}
+        <TypingText
+          targetText={targetText}
+          charStates={charStates}
+          currentIndex={currentIndex}
+          extraChars={extraChars}
+        />
+
+        <div className={zenMode ? "opacity-0 hover:opacity-100 transition-opacity duration-300" : ""}>
+          <TranslationPanel
+            translation={targetSentence?.translation ?? null}
+            mode={translationMode}
+            revealed={isRevealed}
+            onReveal={() => targetSentenceId && setRevealedSentenceId(targetSentenceId)}
+          />
+          {targetSentence && (
+            <SentenceInfoPanel
+              textId={textId}
+              sentence={targetSentence}
+              onGrammarNoteSaved={handleGrammarNoteSaved}
+              onPhraseAdded={handlePhraseAdded}
+              onPhraseDeleted={handlePhraseDeleted}
             />
-            {targetSentence && (
-              <SentenceInfoPanel
-                textId={textId}
-                sentence={targetSentence}
-                onGrammarNoteSaved={handleGrammarNoteSaved}
-                onPhraseAdded={handlePhraseAdded}
-                onPhraseDeleted={handlePhraseDeleted}
-              />
-            )}
-          </>
-        )}
+          )}
+        </div>
       </div>
 
-      <WordHelpTooltip word={errorWord} />
+      <WordHelpTooltip word={errorWordInfo?.word ?? null} activeCharIndex={errorWordInfo?.position} />
+
+      {chunkSummary && (
+        <SessionSummaryModal
+          wpm={chunkSummary.wpm}
+          accuracy={chunkSummary.accuracy}
+          durationSeconds={chunkSummary.durationSeconds}
+          wpmHistory={chunkSummary.wpmHistory}
+          failedWords={chunkSummary.failedWords}
+          onContinue={handleContinue}
+        />
+      )}
     </div>
   );
 }
@@ -286,28 +348,6 @@ function CenteredMessage({ text, children }: { text: string; children?: ReactNod
     <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
       <p className="text-gray-400 text-sm">{text}</p>
       {children}
-    </div>
-  );
-}
-
-function ChunkCompleteSummary({
-  wpm,
-  accuracy,
-  onContinue,
-}: {
-  wpm: number;
-  accuracy: number;
-  onContinue: () => void;
-}) {
-  return (
-    <div className="text-center py-16">
-      <p className="text-white text-lg mb-2">Fragmento completado</p>
-      <p className="text-gray-400 text-sm mb-8">
-        {wpm} WPM · {accuracy}% precision
-      </p>
-      <button onClick={onContinue} className="bg-white text-black rounded px-4 py-2 text-sm font-medium">
-        Continuar
-      </button>
     </div>
   );
 }

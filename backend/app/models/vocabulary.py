@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,7 +14,11 @@ class VocabularyItem(Base):
     dictionary_service.lookup) instead of being duplicated here."""
 
     __tablename__ = "vocabulary_items"
-    __table_args__ = (UniqueConstraint("user_id", "word", name="uq_vocabulary_items_user_word"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "word", name="uq_vocabulary_items_user_word"),
+        Index("ix_vocabulary_items_user_mastery", "user_id", "mastery_score"),
+    )
+
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(

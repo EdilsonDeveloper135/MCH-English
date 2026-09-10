@@ -21,7 +21,8 @@ _ABBREVIATIONS = {
 # Splits right after sentence-ending punctuation, only when followed by whitespace and
 # then a capital letter, digit or quote (a reasonable heuristic for "new sentence starts here").
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'])")
-_WORD_RE = re.compile(r"[A-Za-z0-9']+")
+_WORD_RE = re.compile(r"[\w'’]+(?:-[\w'’]+)*", re.UNICODE)
+
 
 
 def clean_text(raw: str) -> str:

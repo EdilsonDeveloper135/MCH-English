@@ -99,3 +99,37 @@ async def test_add_and_delete_a_grammar_phrase_on_a_sentence(
 
     chunk_after_delete = (await client.get(f"/texts/{text['id']}/chunks/0", headers=auth_headers)).json()
     assert chunk_after_delete["sentences"][0]["phrases"] == []
+
+
+async def test_update_translation_and_alignment_endpoints(
+    client: AsyncClient, auth_headers: dict[str, str], process_text_now
+):
+    text = await _create_text(client, auth_headers)
+    await process_text_now(text["id"])
+
+    # Update translation
+    update_res = await client.patch(
+        f"/texts/{text['id']}/translation",
+        json={"translation_content": "Aprender un idioma requiere práctica constante."},
+        headers=auth_headers,
+    )
+    assert update_res.status_code == 200
+    assert update_res.json()["alignment_status"] == "needs_review"
+
+    # Get alignment
+    align_res = await client.get(f"/texts/{text['id']}/alignment", headers=auth_headers)
+    assert align_res.status_code == 200
+    align_data = align_res.json()
+    assert "links" in align_data
+    assert "alignment_status" in align_data
+
+    # Update alignment
+    confirm_res = await client.put(
+        f"/texts/{text['id']}/alignment",
+        json={"links": align_data["links"]},
+        headers=auth_headers,
+    )
+    assert confirm_res.status_code == 200
+    assert confirm_res.json()["alignment_status"] == "confirmed"
+
+

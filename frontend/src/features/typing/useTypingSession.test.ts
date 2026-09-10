@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { FormEvent, KeyboardEvent } from "react";
-import { buildTargetText, findSentenceIdAt, useTypingSession } from "./useTypingSession";
+import { buildTargetText, findSentenceIdAt, findWordStart, useTypingSession, wordAtPosition } from "./useTypingSession";
 
 function keyEvent(key: string) {
   return { key, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLInputElement>;
@@ -124,7 +124,7 @@ describe("useTypingSession", () => {
     expect(stats.finalCharStates).toEqual(["correct", "incorrect"]);
   });
 
-  it("calls onWordError with the target word once a character inside it is mistyped", () => {
+  it("calls onWordError with the complete target word and index when any character is mistyped", () => {
     const onWordError = vi.fn();
     const { result } = renderHook(() =>
       useTypingSession({ targetText: "Hi cats", sentenceRanges: [], onWordError })
@@ -135,7 +135,108 @@ describe("useTypingSession", () => {
     act(() => result.current.handleKeyDown(keyEvent(" ")));
     act(() => result.current.handleKeyDown(keyEvent("x"))); // typo on "cats"
 
-    expect(onWordError).toHaveBeenCalledWith("c");
+    expect(onWordError).toHaveBeenCalledWith("cats", 3);
+  });
+
+  it("calls onWordError with the complete word for errors in first, middle, or last letter", () => {
+    const onWordError = vi.fn();
+    const { result } = renderHook(() =>
+      useTypingSession({ targetText: "elephant", sentenceRanges: [], onWordError })
+    );
+
+    // Mistype first letter
+    act(() => result.current.handleKeyDown(keyEvent("x")));
+    expect(onWordError).toHaveBeenLastCalledWith("elephant", 0);
+
+    // Undo and type correctly then mistype middle letter
+    act(() => result.current.handleKeyDown(keyEvent("Backspace")));
+    act(() => result.current.handleKeyDown(keyEvent("e")));
+    act(() => result.current.handleKeyDown(keyEvent("l")));
+    act(() => result.current.handleKeyDown(keyEvent("x"))); // mistyped 'e'
+    expect(onWordError).toHaveBeenLastCalledWith("elephant", 2);
+  });
+
+  it("buffers extra characters typed at word end without advancing into next word", () => {
+    const onWordError = vi.fn();
+    const { result } = renderHook(() =>
+      useTypingSession({ targetText: "cat dog", sentenceRanges: [], onWordError })
+    );
+
+    // Type "cat"
+    for (const ch of "cat") {
+      act(() => result.current.handleKeyDown(keyEvent(ch)));
+    }
+    expect(result.current.currentIndex).toBe(3); // index of space
+
+    // Accidentally type 's' instead of space
+    act(() => result.current.handleKeyDown(keyEvent("s")));
+    expect(result.current.currentIndex).toBe(3); // cursor must NOT advance past space
+    expect(result.current.extraChars[0]).toEqual(["s"]);
+    expect(onWordError).toHaveBeenCalledWith("cat", 2);
+
+    // Backspace removes the extra character
+    act(() => result.current.handleKeyDown(keyEvent("Backspace")));
+    expect(result.current.currentIndex).toBe(3);
+    expect(result.current.extraChars[0]).toBeUndefined();
+
+    // Now type space and continue
+    act(() => result.current.handleKeyDown(keyEvent(" ")));
+    expect(result.current.currentIndex).toBe(4); // moves to 'd' in "dog"
+  });
+
+  it("extracts complete words including accented and hyphenated compound words", () => {
+    expect(wordAtPosition("a café visit", 4)).toBe("café");
+    expect(wordAtPosition("a well-known book", 6)).toBe("well-known");
+    expect(wordAtPosition("a well-known book", 2)).toBe("well-known");
+    expect(wordAtPosition("a naïve person", 4)).toBe("naïve");
+  });
+
+  it("atomic word backspace (Ctrl+Backspace) reverts the current word in a single action", () => {
+    const { result } = renderHook(() =>
+      useTypingSession({ targetText: "the quick brown", sentenceRanges: [] })
+    );
+
+    // Type "the quic"
+    for (const ch of "the quic") {
+      act(() => result.current.handleKeyDown(keyEvent(ch)));
+    }
+    expect(result.current.currentIndex).toBe(8);
+
+    // Press Ctrl+Backspace
+    act(() =>
+      result.current.handleKeyDown({
+        key: "Backspace",
+        ctrlKey: true,
+        preventDefault: vi.fn(),
+      } as unknown as KeyboardEvent<HTMLInputElement>)
+    );
+
+    // Cursor should jump back to start of "quick" (index 4)
+    expect(result.current.currentIndex).toBe(4);
+    expect(result.current.charStates[4]).toBe("pending");
+    expect(result.current.charStates[3]).toBe("correct"); // space after "the"
+  });
+
+  it("handles rapid burst typing without losing characters or state race conditions", () => {
+    const onComplete = vi.fn();
+    const text = "rapid burst typing test without losing any single character";
+    const { result } = renderHook(() =>
+      useTypingSession({ targetText: text, sentenceRanges: [], onComplete })
+    );
+
+    // Fire 60 keystrokes synchronously in a tight loop (simulating >100 WPM burst)
+    act(() => {
+      for (const ch of text) {
+        result.current.handleKeyDown(keyEvent(ch));
+      }
+    });
+
+    expect(result.current.currentIndex).toBe(text.length);
+    expect(result.current.isComplete).toBe(true);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const stats = onComplete.mock.calls[0][0];
+    expect(stats.correct_characters).toBe(text.length);
+    expect(stats.incorrect_characters).toBe(0);
   });
 
   it("handleInput processes a native InputEvent the same way, for virtual keyboards that don't report a real keydown key", () => {

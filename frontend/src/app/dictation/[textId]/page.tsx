@@ -28,6 +28,7 @@ export default function DictationPage() {
   );
   const [roundAccuracies, setRoundAccuracies] = useState<number[]>([]);
   const [summary, setSummary] = useState<{ rounds: number; averageAccuracy: number } | null>(null);
+  const [textTitle, setTextTitle] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -35,6 +36,7 @@ export default function DictationPage() {
       router.replace("/login");
       return;
     }
+    api.getText(textId).then((t) => setTextTitle(t.title)).catch(() => {});
     api
       .createDictationSession(textId)
       .then((data) => {
@@ -104,7 +106,8 @@ export default function DictationPage() {
       <div className="min-h-screen flex flex-col items-center justify-center px-6">
         <div className="w-full max-w-3xl">
           <p className="text-gray-400 text-sm mb-6">
-            Dictation · {roundIndex + 1}/{session.rounds.length}
+            {textTitle ? <span className="text-gray-300 font-medium">{textTitle} · </span> : null}
+            Dictation · Oración {roundIndex + 1}/{session.rounds.length}
           </p>
 
           {lastResult ? (
@@ -192,6 +195,17 @@ function RoundResult({
   onNext: () => void;
   isLast: boolean;
 }) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.code === "Space" || e.key === " ") {
+        e.preventDefault();
+        onNext();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onNext]);
+
   return (
     <div className="py-10">
       <p className="font-mono text-lg text-white mb-1">{result.expected}</p>
@@ -202,8 +216,15 @@ function RoundResult({
       <p className="text-gray-400 text-sm mb-8">
         {result.correct_words} palabras correctas · {result.incorrect_words} incorrectas
       </p>
-      <button onClick={onNext} className="bg-white text-black rounded px-4 py-2 text-sm font-medium">
-        {isLast ? "Terminar" : "Siguiente"}
+      <button
+        type="button"
+        onClick={onNext}
+        className="bg-white text-black rounded px-4 py-2 text-sm font-medium flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none hover:bg-gray-200"
+      >
+        <span>{isLast ? "Terminar" : "Siguiente"}</span>
+        <kbd className="text-[10px] bg-neutral-200 text-neutral-800 px-1.5 py-0.5 rounded font-mono">
+          Enter ↵
+        </kbd>
       </button>
     </div>
   );

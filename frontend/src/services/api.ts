@@ -115,6 +115,8 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
+  logout: () => request<void>("/auth/logout", { method: "POST" }),
+
   me: () => request<{ id: string; email: string }>("/auth/me"),
 
   listTexts: () => request<TextDTO[]>("/texts"),

@@ -1,7 +1,8 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useMemo, useRef } from "react";
 import type { CharStatus } from "@/features/typing/useTypingSession";
+import { SmoothCaret } from "./SmoothCaret";
 
 const STATE_CLASSES: Record<CharStatus, string> = {
   pending: "text-gray-400",
@@ -13,6 +14,7 @@ interface TypingTextProps {
   targetText: string;
   charStates: CharStatus[];
   currentIndex: number;
+  extraChars?: Record<number, string[]>;
   /** For Recall's Spanish -> English mode: don't reveal not-yet-typed letters,
    * show an underscore placeholder instead (word boundaries stay visible). */
   hidePending?: boolean;
@@ -39,11 +41,23 @@ function splitIntoBlocks(text: string): Block[] {
   return blocks;
 }
 
-export function TypingText({ targetText, charStates, currentIndex, hidePending = false }: TypingTextProps) {
+export function TypingText({
+  targetText,
+  charStates,
+  currentIndex,
+  extraChars,
+  hidePending = false,
+}: TypingTextProps) {
   const blocks = useMemo(() => splitIntoBlocks(targetText), [targetText]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isComplete = targetText.length > 0 && currentIndex >= targetText.length;
 
   return (
-    <div className="font-mono text-xl leading-relaxed whitespace-pre-wrap tracking-wide select-none">
+    <div
+      ref={containerRef}
+      className="relative font-mono text-lg md:text-xl leading-relaxed whitespace-pre-wrap tracking-wide select-none"
+    >
+      <SmoothCaret containerRef={containerRef} currentIndex={currentIndex} isComplete={isComplete} />
       {blocks.map((block) => (
         <TypingWordBlock
           key={block.start}
@@ -52,6 +66,7 @@ export function TypingText({ targetText, charStates, currentIndex, hidePending =
           chars={block.chars}
           charStates={charStates}
           currentIndex={currentIndex}
+          extraChars={extraChars?.[block.start]}
           hidePending={hidePending}
         />
       ))}
@@ -65,11 +80,13 @@ interface TypingWordBlockProps {
   chars: string;
   charStates: CharStatus[];
   currentIndex: number;
+  extraChars?: string[];
   hidePending: boolean;
 }
 
 function areBlockPropsEqual(prev: TypingWordBlockProps, next: TypingWordBlockProps): boolean {
   if (prev.chars !== next.chars || prev.hidePending !== next.hidePending) return false;
+  if ((prev.extraChars?.length ?? 0) !== (next.extraChars?.length ?? 0)) return false;
 
   const prevCursorHere = prev.currentIndex >= prev.start && prev.currentIndex < prev.end;
   const nextCursorHere = next.currentIndex >= next.start && next.currentIndex < next.end;
@@ -87,6 +104,7 @@ const TypingWordBlock = memo(function TypingWordBlock({
   chars,
   charStates,
   currentIndex,
+  extraChars,
   hidePending,
 }: TypingWordBlockProps) {
   return (
@@ -97,11 +115,24 @@ const TypingWordBlock = memo(function TypingWordBlock({
         const isCurrent = i === currentIndex;
         const display = hidePending && state === "pending" && char !== " " ? "_" : char;
         return (
-          <span key={i} className={[STATE_CLASSES[state], isCurrent ? "border-l-2 border-cyan-400" : ""].join(" ")}>
+          <span
+            key={i}
+            data-char-index={i}
+            className={[STATE_CLASSES[state], isCurrent ? "border-l-2 border-cyan-400" : ""].join(" ")}
+          >
             {display}
           </span>
         );
       })}
+      {extraChars && extraChars.length > 0 && (
+        <>
+          {extraChars.map((ch, idx) => (
+            <span key={`extra-${idx}`} className="text-red-700 line-through">
+              {ch}
+            </span>
+          ))}
+        </>
+      )}
     </>
   );
 },

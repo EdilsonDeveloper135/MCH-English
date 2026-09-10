@@ -2,17 +2,20 @@ import time
 import uuid
 
 import redis.asyncio as aioredis
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
 import structlog
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api import auth, dictation, dictionary, gamification, recall, sessions, settings, statistics, texts, vocabulary
 from app.core.config import settings as app_settings
 from app.core.database import get_db
+from app.core.limiter import limiter
 
 structlog.configure(
     processors=[
@@ -56,11 +59,13 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
 
 app = FastAPI(title="MCH-English API")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=app_settings.cors_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -89,7 +94,7 @@ async def health(db: AsyncSession = Depends(get_db)):
         pass
 
     try:
-        redis_client = aioredis.from_url(app_settings.redis_url)
+        redis_client = aioredis.from_url(app_settings.redis_url, socket_timeout=3.0)
         try:
             await redis_client.ping()
             checks["redis"] = True

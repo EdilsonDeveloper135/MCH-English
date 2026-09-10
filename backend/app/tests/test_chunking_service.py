@@ -45,3 +45,16 @@ def test_build_chunks_respects_target_range():
     for chunk in chunks[:-1]:
         words = count_words(" ".join(chunk))
         assert words >= 30
+
+
+def test_word_tokenization_supports_unicode_and_hyphenated_words():
+    from app.services.chunking_service import extract_words
+
+    sample = "At the café, a naïve guest ordered a well-known dish; it’s a résumé test."
+    words = extract_words(sample)
+    assert "café" in words
+    assert "naïve" in words
+    assert "well-known" in words
+    assert "résumé" in words
+    assert "it’s" in words
+

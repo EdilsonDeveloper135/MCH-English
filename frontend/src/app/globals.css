@@ -2,7 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-primary: #000000;
+  --bg-surface: #0a0a0a;
+  --text-primary: #e5e7eb;
+  --text-muted: #9ca3af;
+  --accent: #22d3ee;
+  --char-pending: #9ca3af;
+  --char-correct: #ffffff;
+  --char-incorrect: #ef4444;
+}
+
+[data-theme="nord"] {
+  --bg-primary: #1e222a;
+  --bg-surface: #282c34;
+  --text-primary: #eceff4;
+  --text-muted: #88c0d0;
+  --accent: #88c0d0;
+  --char-pending: #616e88;
+  --char-correct: #eceff4;
+  --char-incorrect: #bf616a;
+}
+
+[data-theme="catppuccin"] {
+  --bg-primary: #1e1e2e;
+  --bg-surface: #181825;
+  --text-primary: #cdd6f4;
+  --text-muted: #a6adc8;
+  --accent: #89b4fa;
+  --char-pending: #6c7086;
+  --char-correct: #cdd6f4;
+  --char-incorrect: #f38ba8;
+}
+
+[data-theme="sepia"] {
+  --bg-primary: #fbf1c7;
+  --bg-surface: #ebdbb2;
+  --text-primary: #3c3836;
+  --text-muted: #7c6f64;
+  --accent: #b57614;
+  --char-pending: #928374;
+  --char-correct: #282828;
+  --char-incorrect: #cc241d;
+}
+
 html,
 body {
   height: 100%;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+@keyframes caret-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* When SmoothCaret is running inside typing areas, suppress legacy inline border to avoid double-carets */
+.cursor-text [data-char-index] {
+  border-left-color: transparent !important;
+}
+
+/* Color overrides for typing characters under specific themes to maintain AA contrast */
+[data-theme="sepia"] .cursor-text [data-char-index].text-white {
+  color: #282828 !important;
+}
+[data-theme="sepia"] .cursor-text [data-char-index].text-gray-400 {
+  color: #7c6f64 !important;
+}
+[data-theme="sepia"] .cursor-text [data-char-index].text-red-500 {
+  color: #cc241d !important;
+}
+
+[data-theme="nord"] .cursor-text [data-char-index].text-white {
+  color: #eceff4 !important;
+}
+[data-theme="nord"] .cursor-text [data-char-index].text-gray-400 {
+  color: #616e88 !important;
+}
+
+[data-theme="catppuccin"] .cursor-text [data-char-index].text-white {
+  color: #cdd6f4 !important;
+}
+[data-theme="catppuccin"] .cursor-text [data-char-index].text-gray-400 {
+  color: #6c7086 !important;
+}
+
+
+

@@ -9,6 +9,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import type { ErrorInput } from "@/types";
+import { audioCuePlayer } from "./audioCues";
 
 export type CharStatus = "pending" | "correct" | "incorrect";
 
@@ -27,6 +28,7 @@ export interface ChunkCompleteStats {
   /** Final per-character correctness, in case a caller needs to reconstruct what was
    * actually typed (e.g. Recall attempts) instead of just the aggregate counts. */
   finalCharStates: CharStatus[];
+  wpmHistory?: number[];
 }
 
 interface TargetSentence {
@@ -60,10 +62,48 @@ export function findSentenceIdAt(sentenceRanges: SentenceRange[], position: numb
   return range ? range.sentenceId : null;
 }
 
-function wordAtPosition(text: string, position: number): string {
-  const before = text.slice(0, position + 1);
-  const match = before.match(/[A-Za-z0-9']+$/);
-  return match ? match[0] : "";
+/** Extracts the full word surrounding `position` by expanding bidirectionally. */
+export function wordAtPosition(text: string, position: number): string {
+  if (position < 0 || position >= text.length) return "";
+  const isWordChar = (c: string) => /[\p{L}\p{N}'’-]/u.test(c);
+
+  let pos = position;
+  if (!isWordChar(text[pos])) {
+    if (pos > 0 && isWordChar(text[pos - 1])) {
+      pos = pos - 1;
+    } else {
+      return "";
+    }
+  }
+
+  let start = pos;
+  while (start > 0 && isWordChar(text[start - 1])) {
+    start--;
+  }
+
+  let end = pos + 1;
+  while (end < text.length && isWordChar(text[end])) {
+    end++;
+  }
+
+  return text.slice(start, end).replace(/^-+|-+$/g, "");
+}
+
+/** Finds the start index of the word containing or preceding `position`. */
+export function findWordStart(text: string, position: number): number {
+  if (position <= 0) return 0;
+  const isWordChar = (c: string) => /[\p{L}\p{N}'’-]/u.test(c);
+  let pos = Math.min(position, text.length - 1);
+
+  // If currently on whitespace/punctuation, skip backwards to word chars
+  while (pos > 0 && !isWordChar(text[pos])) {
+    pos--;
+  }
+  // Then find the beginning of this word
+  while (pos > 0 && isWordChar(text[pos - 1])) {
+    pos--;
+  }
+  return pos;
 }
 
 interface UseTypingSessionArgs {
@@ -72,7 +112,7 @@ interface UseTypingSessionArgs {
   initialIndex?: number;
   onSentenceComplete?: (sentenceId: string, endIndex: number) => void;
   onComplete?: (stats: ChunkCompleteStats) => void;
-  onWordError?: (word: string) => void;
+  onWordError?: (word: string, position: number) => void;
 }
 
 export function useTypingSession({
@@ -85,38 +125,72 @@ export function useTypingSession({
 }: UseTypingSessionArgs) {
   const clampedInitial = Math.min(Math.max(initialIndex, 0), targetText.length);
 
-  const [charStates, setCharStates] = useState<CharStatus[]>(() => {
+  // Mutable refs for high-frequency state to avoid stale closure race conditions at >100 WPM
+  const currentIndexRef = useRef(clampedInitial);
+  const charStatesRef = useRef<CharStatus[]>([]);
+  const correctCountRef = useRef(0);
+  const incorrectCountRef = useRef(0);
+  const errorsRef = useRef<ErrorInput[]>([]);
+  const startedAtRef = useRef<number | null>(null);
+  const extraCharsRef = useRef<Record<number, string[]>>({});
+  const completedSentences = useRef<Set<string>>(new Set());
+  const wpmHistoryRef = useRef<number[]>([]);
+
+  // Initialize refs
+  if (charStatesRef.current.length !== targetText.length) {
     const states = Array<CharStatus>(targetText.length).fill("pending");
     for (let i = 0; i < clampedInitial; i++) states[i] = "correct";
-    return states;
-  });
+    charStatesRef.current = states;
+  }
+
+  // React state for UI rendering
+  const [charStates, setCharStates] = useState<CharStatus[]>(() => charStatesRef.current);
   const [currentIndex, setCurrentIndex] = useState(clampedInitial);
+  const [extraChars, setExtraChars] = useState<Record<number, string[]>>({});
   const [correctCount, setCorrectCount] = useState(0);
   const [incorrectCount, setIncorrectCount] = useState(0);
-  const [errors, setErrors] = useState<ErrorInput[]>([]);
+  const [, setErrors] = useState<ErrorInput[]>([]);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
-  const completedSentences = useRef<Set<string>>(new Set());
   const isComplete = targetText.length > 0 && currentIndex >= targetText.length;
 
   useEffect(() => {
     const states = Array<CharStatus>(targetText.length).fill("pending");
     for (let i = 0; i < clampedInitial; i++) states[i] = "correct";
+
+    charStatesRef.current = states;
+    currentIndexRef.current = clampedInitial;
+    correctCountRef.current = 0;
+    incorrectCountRef.current = 0;
+    errorsRef.current = [];
+    startedAtRef.current = null;
+    extraCharsRef.current = {};
+    completedSentences.current = new Set();
+    wpmHistoryRef.current = [];
+
     setCharStates(states);
     setCurrentIndex(clampedInitial);
+    setExtraChars({});
     setCorrectCount(0);
     setIncorrectCount(0);
     setErrors([]);
     setStartedAt(null);
-    completedSentences.current = new Set();
-    // Only re-run when the target text itself changes (new chunk loaded).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetText]);
 
   useEffect(() => {
     if (!startedAt || isComplete) return;
-    const interval = setInterval(() => setNow(Date.now()), 1000);
+    const interval = setInterval(() => {
+      const currentNow = Date.now();
+      setNow(currentNow);
+      const total = correctCountRef.current + incorrectCountRef.current;
+      const elapsed = (currentNow - startedAt) / 1000;
+      if (elapsed > 0) {
+        const wpm = Math.round(total / 5 / (elapsed / 60));
+        wpmHistoryRef.current.push(wpm);
+      }
+    }, 1000);
     return () => clearInterval(interval);
   }, [startedAt, isComplete]);
 
@@ -135,101 +209,199 @@ export function useTypingSession({
   );
 
   const applyBackspace = useCallback(() => {
-    if (currentIndex === 0) return;
-    const prevIndex = currentIndex - 1;
-    const prevState = charStates[prevIndex];
+    const idx = currentIndexRef.current;
+    const wordStart = findWordStart(targetText, Math.max(0, idx - 1));
+    const extras = extraCharsRef.current[wordStart];
 
-    const next = [...charStates];
-    next[prevIndex] = "pending";
-    setCharStates(next);
-    setCurrentIndex(prevIndex);
-
-    // Undo whatever this character previously counted as, so retyping it doesn't
-    // double-count -- otherwise correct/incorrect totals (and the accuracy/WPM
-    // derived from them) inflate past what was actually typed.
-    if (prevState === "correct") {
-      setCorrectCount((c) => Math.max(0, c - 1));
-    } else if (prevState === "incorrect") {
-      setIncorrectCount((c) => Math.max(0, c - 1));
-      setErrors((prev) => {
-        const lastMatch = prev.map((err) => err.position).lastIndexOf(prevIndex);
-        if (lastMatch === -1) return prev;
-        return [...prev.slice(0, lastMatch), ...prev.slice(lastMatch + 1)];
-      });
+    // Pop extra characters first if any exist
+    if (extras && extras.length > 0) {
+      const nextExtras = extras.slice(0, -1);
+      if (nextExtras.length === 0) {
+        const { [wordStart]: _, ...rest } = extraCharsRef.current;
+        extraCharsRef.current = rest;
+      } else {
+        extraCharsRef.current = { ...extraCharsRef.current, [wordStart]: nextExtras };
+      }
+      setExtraChars({ ...extraCharsRef.current });
+      incorrectCountRef.current = Math.max(0, incorrectCountRef.current - 1);
+      setIncorrectCount(incorrectCountRef.current);
+      if (errorsRef.current.length > 0) {
+        errorsRef.current.pop();
+        setErrors([...errorsRef.current]);
+      }
+      return;
     }
-  }, [currentIndex, charStates]);
+
+    if (idx === 0) return;
+    const prevIndex = idx - 1;
+    const prevState = charStatesRef.current[prevIndex];
+
+    charStatesRef.current[prevIndex] = "pending";
+    currentIndexRef.current = prevIndex;
+
+    if (prevState === "correct") {
+      correctCountRef.current = Math.max(0, correctCountRef.current - 1);
+    } else if (prevState === "incorrect") {
+      incorrectCountRef.current = Math.max(0, incorrectCountRef.current - 1);
+      const lastMatch = errorsRef.current.map((err) => err.position).lastIndexOf(prevIndex);
+      if (lastMatch !== -1) {
+        errorsRef.current = [
+          ...errorsRef.current.slice(0, lastMatch),
+          ...errorsRef.current.slice(lastMatch + 1),
+        ];
+      }
+    }
+
+    setCurrentIndex(prevIndex);
+    setCharStates([...charStatesRef.current]);
+    setCorrectCount(correctCountRef.current);
+    setIncorrectCount(incorrectCountRef.current);
+    setErrors([...errorsRef.current]);
+  }, [targetText]);
+
+  const applyWordBackspace = useCallback(() => {
+    const idx = currentIndexRef.current;
+    if (idx === 0) return;
+
+    // Clear extra characters for current word
+    const wordStart = findWordStart(targetText, Math.max(0, idx - 1));
+    const extrasCount = extraCharsRef.current[wordStart]?.length ?? 0;
+    if (extrasCount > 0) {
+      const { [wordStart]: _, ...rest } = extraCharsRef.current;
+      extraCharsRef.current = rest;
+      setExtraChars({ ...extraCharsRef.current });
+      incorrectCountRef.current = Math.max(0, incorrectCountRef.current - extrasCount);
+      for (let k = 0; k < extrasCount && errorsRef.current.length > 0; k++) {
+        errorsRef.current.pop();
+      }
+    }
+
+    const targetIndex = findWordStart(targetText, idx - 1);
+
+    for (let i = idx - 1; i >= targetIndex; i--) {
+      const prevState = charStatesRef.current[i];
+      charStatesRef.current[i] = "pending";
+      if (prevState === "correct") {
+        correctCountRef.current = Math.max(0, correctCountRef.current - 1);
+      } else if (prevState === "incorrect") {
+        incorrectCountRef.current = Math.max(0, incorrectCountRef.current - 1);
+        const lastMatch = errorsRef.current.map((err) => err.position).lastIndexOf(i);
+        if (lastMatch !== -1) {
+          errorsRef.current = [
+            ...errorsRef.current.slice(0, lastMatch),
+            ...errorsRef.current.slice(lastMatch + 1),
+          ];
+        }
+      }
+    }
+
+    currentIndexRef.current = targetIndex;
+    setCurrentIndex(targetIndex);
+    setCharStates([...charStatesRef.current]);
+    setCorrectCount(correctCountRef.current);
+    setIncorrectCount(incorrectCountRef.current);
+    setErrors([...errorsRef.current]);
+  }, [targetText]);
 
   const applyCharacter = useCallback(
     (typedChar: string) => {
-      const sessionStart = startedAt ?? Date.now();
-      if (!startedAt) setStartedAt(sessionStart);
+      const idx = currentIndexRef.current;
+      if (idx >= targetText.length) return;
 
-      const expected = targetText[currentIndex];
+      const currentStarted = startedAtRef.current;
+      if (!currentStarted) {
+        const start = Date.now();
+        startedAtRef.current = start;
+        setStartedAt(start);
+      }
+
+      const expected = targetText[idx];
       const isCorrect = typedChar === expected;
-      const nextIndex = currentIndex + 1;
 
-      // Computed directly from the closure value and passed to setCharStates as a
-      // plain value (not a functional updater) so `finalCharStates` is genuinely
-      // synchronous here -- relying on a functional updater's callback to run before
-      // this point is not guaranteed and previously left the last character "pending"
-      // in the stats handed to onComplete.
-      const finalCharStates: CharStatus[] = [...charStates];
-      finalCharStates[currentIndex] = isCorrect ? "correct" : "incorrect";
-      setCharStates(finalCharStates);
-      setCurrentIndex(nextIndex);
+      // Handle accidental extra/duplicate characters non-destructively
+      const wordStart = findWordStart(targetText, idx);
+      const isWordChar = (c: string) => /[\p{L}\p{N}'’-]/u.test(c);
+      const isDuplicate = !isCorrect && idx > 0 && typedChar === targetText[idx - 1] && isWordChar(typedChar);
+      const isAtWordEnd = !isCorrect && expected === " " && isWordChar(typedChar);
 
-      let finalCorrectCount = correctCount;
-      let finalIncorrectCount = incorrectCount;
-      let finalErrors = errors;
+      if (isDuplicate || isAtWordEnd) {
+        extraCharsRef.current = {
+          ...extraCharsRef.current,
+          [wordStart]: [...(extraCharsRef.current[wordStart] || []), typedChar],
+        };
+        setExtraChars({ ...extraCharsRef.current });
+        incorrectCountRef.current += 1;
+        setIncorrectCount(incorrectCountRef.current);
+        const errorPos = isAtWordEnd ? Math.max(0, idx - 1) : idx;
+        const word = wordAtPosition(targetText, errorPos);
+        errorsRef.current.push({
+          expected_char: expected,
+          typed_char: typedChar,
+          position: idx,
+          word,
+          sentence_id: sentenceIdAt(idx),
+        });
+        if (word) onWordError?.(word, errorPos);
+        audioCuePlayer.playError();
+        return;
+      }
+
+      const nextIndex = idx + 1;
+      currentIndexRef.current = nextIndex;
+      charStatesRef.current[idx] = isCorrect ? "correct" : "incorrect";
+
+      let finalCorrectCount = correctCountRef.current;
+      let finalIncorrectCount = incorrectCountRef.current;
 
       if (isCorrect) {
-        finalCorrectCount = correctCount + 1;
-        setCorrectCount(finalCorrectCount);
+        finalCorrectCount += 1;
+        correctCountRef.current = finalCorrectCount;
+        audioCuePlayer.playClick();
       } else {
-        finalIncorrectCount = incorrectCount + 1;
-        const word = wordAtPosition(targetText, currentIndex);
-        finalErrors = [
-          ...errors,
-          {
-            expected_char: expected,
-            typed_char: typedChar,
-            position: currentIndex,
-            word,
-            sentence_id: sentenceIdAt(currentIndex),
-          },
-        ];
-        setIncorrectCount(finalIncorrectCount);
-        setErrors(finalErrors);
-        if (word) onWordError?.(word);
+        finalIncorrectCount += 1;
+        correctCountRef.current = finalCorrectCount;
+        incorrectCountRef.current = finalIncorrectCount;
+        audioCuePlayer.playError();
+
+        const word = wordAtPosition(targetText, idx);
+        errorsRef.current.push({
+          expected_char: expected,
+          typed_char: typedChar,
+          position: idx,
+          word,
+          sentence_id: sentenceIdAt(idx),
+        });
+        if (word) onWordError?.(word, idx);
       }
+
+      setCurrentIndex(nextIndex);
+      setCharStates([...charStatesRef.current]);
+      setCorrectCount(finalCorrectCount);
+      setIncorrectCount(finalIncorrectCount);
+      setErrors([...errorsRef.current]);
 
       checkSentenceCompletion(nextIndex);
 
       if (nextIndex >= targetText.length) {
-        const durationSeconds = Math.max((Date.now() - sessionStart) / 1000, 0.1);
+        const start = startedAtRef.current ?? Date.now();
+        const durationSeconds = Math.max((Date.now() - start) / 1000, 0.1);
+        const total = finalCorrectCount + finalIncorrectCount;
+        const finalWpm = Math.round(total / 5 / (durationSeconds / 60));
+        const wpmHistory =
+          wpmHistoryRef.current.length > 0 ? [...wpmHistoryRef.current, finalWpm] : [finalWpm];
+
         onComplete?.({
           correct_characters: finalCorrectCount,
           incorrect_characters: finalIncorrectCount,
           total_characters: finalCorrectCount + finalIncorrectCount,
           duration_seconds: durationSeconds,
-          errors: finalErrors,
-          finalCharStates,
+          errors: [...errorsRef.current],
+          finalCharStates: [...charStatesRef.current],
+          wpmHistory,
         });
       }
     },
-    [
-      currentIndex,
-      targetText,
-      startedAt,
-      sentenceIdAt,
-      checkSentenceCompletion,
-      correctCount,
-      incorrectCount,
-      errors,
-      charStates,
-      onComplete,
-      onWordError,
-    ]
+    [targetText, sentenceIdAt, checkSentenceCompletion, onWordError, onComplete]
   );
 
   const handleKeyDown = useCallback(
@@ -238,7 +410,11 @@ export function useTypingSession({
 
       if (e.key === "Backspace") {
         e.preventDefault();
-        applyBackspace();
+        if (e.ctrlKey || e.altKey || e.metaKey) {
+          applyWordBackspace();
+        } else {
+          applyBackspace();
+        }
         return;
       }
 
@@ -246,17 +422,9 @@ export function useTypingSession({
       e.preventDefault();
       applyCharacter(e.key);
     },
-    [isComplete, applyBackspace, applyCharacter]
+    [isComplete, applyBackspace, applyWordBackspace, applyCharacter]
   );
 
-  // Fallback path for touch/virtual keyboards (notably Android's Gboard) that don't
-  // report real `key` values on `keydown` -- they fire "Unidentified" instead, so
-  // handleKeyDown's `e.key.length !== 1` guard bails out without calling
-  // preventDefault(), and the browser goes on to actually insert the character into
-  // this always-emptied input, firing a native `input` event with the true typed
-  // text in `data`. Desktop and iOS Safari report proper `key` values on keydown, so
-  // there `preventDefault()` already suppresses the DOM mutation and this handler
-  // never fires for those keystrokes -- no double-counting.
   const handleInput = useCallback(
     (e: ReactFormEvent<HTMLInputElement>) => {
       const target = e.currentTarget;
@@ -283,6 +451,7 @@ export function useTypingSession({
   return {
     charStates,
     currentIndex,
+    extraChars,
     isComplete,
     liveWpm,
     liveAccuracy,

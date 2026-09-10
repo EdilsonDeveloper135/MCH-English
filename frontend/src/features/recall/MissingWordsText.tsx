@@ -77,10 +77,27 @@ export function MissingWordsText({ content, blanks, charStates, currentIndex }: 
           );
         }
 
-        const display = state === "pending" ? "_" : seg.char;
+        if (state === "pending") {
+          return (
+            <span
+              key={i}
+              className={`border-b-2 ${
+                isCurrent ? "border-cyan-400 animate-pulse" : "border-gray-500"
+              } mx-0.5 inline-block min-w-[0.85em] text-center font-mono`}
+            >
+              {"\u00A0"}
+            </span>
+          );
+        }
+
         return (
-          <span key={i} className={[STATE_CLASSES[state], isCurrent ? "border-l-2 border-cyan-400" : ""].join(" ")}>
-            {display}
+          <span
+            key={i}
+            className={`border-b-2 border-transparent mx-0.5 inline-block min-w-[0.85em] text-center font-mono ${
+              STATE_CLASSES[state]
+            } ${isCurrent ? "border-b-cyan-400" : ""}`}
+          >
+            {seg.char}
           </span>
         );
       })}
