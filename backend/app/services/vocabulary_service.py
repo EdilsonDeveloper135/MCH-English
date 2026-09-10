@@ -156,3 +156,30 @@ async def get_mastery_distribution(db: AsyncSession, user_id: uuid.UUID) -> list
     result = await db.execute(select(VocabularyItem.mastery_score).where(VocabularyItem.user_id == user_id))
     scores = list(result.scalars().all())
     return bucket_mastery_scores(scores)
+
+
+async def get_weak_word_set(db: AsyncSession, user_id: uuid.UUID) -> set[str]:
+    """Same weak-word bar as get_weak_words, but unlimited -- used to cross-reference
+    every word in a whole chunk at once (see compute_difficult_words), not just the
+    top N for a review session."""
+    result = await db.execute(
+        select(VocabularyItem.word).where(
+            VocabularyItem.user_id == user_id,
+            VocabularyItem.encounters >= MIN_ENCOUNTERS_FOR_WEAK,
+            VocabularyItem.mastery_score < WEAK_MASTERY_THRESHOLD,
+        )
+    )
+    return set(result.scalars().all())
+
+
+def compute_difficult_words(sentence_content: str, weak_words: set[str]) -> list[str]:
+    """Sentence's own words that are already tracked as weak for this user (spec
+    section 18's difficult_words) -- a pure cross-reference of data the app already
+    tracks from the user's own typing, no AI and no new input needed. Case-insensitive
+    match, original casing preserved, sentence order, deduped."""
+    seen: dict[str, str] = {}
+    for word in extract_words(sentence_content):
+        lowered = word.lower()
+        if lowered in weak_words and lowered not in seen:
+            seen[lowered] = word
+    return list(seen.values())

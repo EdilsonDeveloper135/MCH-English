@@ -18,11 +18,26 @@ export interface TextDTO {
   created_at: string;
 }
 
+export interface PhraseDTO {
+  id: string;
+  english_phrase: string;
+  spanish_phrase: string;
+}
+
 export interface SentenceDTO {
   id: string;
   index: number;
   content: string;
   translation: string | null;
+  grammar_note: string | null;
+  phrases: PhraseDTO[];
+  difficult_words: string[];
+}
+
+export type TranslationMode = "learning" | "immersion" | "assisted";
+
+export interface UserSettingsDTO {
+  translation_mode: TranslationMode;
 }
 
 export interface AlignmentSentenceDTO {

@@ -11,11 +11,14 @@ import type {
   ErrorInput,
   HistoryPointDTO,
   OverviewStatsDTO,
+  PhraseDTO,
   RecallAttemptDTO,
   RecallMode,
   RecallSessionDTO,
   SessionDTO,
   TextDTO,
+  TranslationMode,
+  UserSettingsDTO,
   VocabularyBucketDTO,
   VocabularyItemDTO,
   WeakWordsSessionDTO,
@@ -117,6 +120,29 @@ export const api = {
     request<HistoryPointDTO[]>(`/statistics/history${days ? `?days=${days}` : ""}`),
 
   getVocabularyDistribution: () => request<VocabularyBucketDTO[]>("/statistics/vocabulary-distribution"),
+
+  getSettings: () => request<UserSettingsDTO>("/settings"),
+
+  updateSettings: (translation_mode: TranslationMode) =>
+    request<UserSettingsDTO>("/settings", {
+      method: "PATCH",
+      body: JSON.stringify({ translation_mode }),
+    }),
+
+  updateGrammarNote: (textId: string, sentenceId: string, grammar_note: string | null) =>
+    request<{ grammar_note: string | null }>(`/texts/${textId}/sentences/${sentenceId}/grammar-note`, {
+      method: "PATCH",
+      body: JSON.stringify({ grammar_note }),
+    }),
+
+  addPhrase: (textId: string, sentenceId: string, english_phrase: string, spanish_phrase: string) =>
+    request<PhraseDTO>(`/texts/${textId}/sentences/${sentenceId}/phrases`, {
+      method: "POST",
+      body: JSON.stringify({ english_phrase, spanish_phrase }),
+    }),
+
+  deletePhrase: (textId: string, sentenceId: string, phraseId: string) =>
+    request<void>(`/texts/${textId}/sentences/${sentenceId}/phrases/${phraseId}`, { method: "DELETE" }),
 
   updateTranslation: (textId: string, translation_content: string) =>
     request<TextDTO>(`/texts/${textId}/translation`, {

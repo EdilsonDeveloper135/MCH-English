@@ -1,4 +1,4 @@
-from app.services.vocabulary_service import bucket_mastery_scores, mastery_score
+from app.services.vocabulary_service import bucket_mastery_scores, compute_difficult_words, mastery_score
 
 
 def test_mastery_score_no_errors():
@@ -45,3 +45,23 @@ def test_bucket_mastery_scores_boundary_goes_to_upper_bucket():
 
 def test_bucket_mastery_scores_counts_multiple_in_same_bucket():
     assert bucket_mastery_scores([5.0, 10.0, 15.0])[0]["count"] == 3
+
+
+def test_compute_difficult_words_excludes_non_weak_words():
+    assert compute_difficult_words("The cat sat on the mat.", {"jumped"}) == []
+
+
+def test_compute_difficult_words_is_case_insensitive():
+    assert compute_difficult_words("Environment matters.", {"environment"}) == ["Environment"]
+
+
+def test_compute_difficult_words_dedupes_repeats():
+    assert compute_difficult_words("The cat saw the cat.", {"cat"}) == ["cat"]
+
+
+def test_compute_difficult_words_preserves_sentence_order():
+    assert compute_difficult_words("Zebra ran before ant.", {"ant", "zebra"}) == ["Zebra", "ant"]
+
+
+def test_compute_difficult_words_empty_weak_set():
+    assert compute_difficult_words("Anything at all.", set()) == []

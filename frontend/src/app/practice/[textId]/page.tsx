@@ -4,12 +4,18 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { api } from "@/services/api";
-import type { ChunkDTO, TextDTO } from "@/types";
+import type { ChunkDTO, PhraseDTO, TextDTO, TranslationMode } from "@/types";
 import { TypingText } from "@/features/typing/TypingText";
 import { TypingStats } from "@/features/typing/TypingStats";
 import { TranslationPanel } from "@/features/typing/TranslationPanel";
+import { SentenceInfoPanel } from "@/features/typing/SentenceInfoPanel";
 import { WordHelpTooltip } from "@/features/typing/WordHelpTooltip";
-import { buildTargetText, useTypingSession, type ChunkCompleteStats } from "@/features/typing/useTypingSession";
+import {
+  buildTargetText,
+  findSentenceIdAt,
+  useTypingSession,
+  type ChunkCompleteStats,
+} from "@/features/typing/useTypingSession";
 
 type LoadState =
   | "loading"
@@ -19,6 +25,12 @@ type LoadState =
   | "finished-text"
   | "needs-alignment"
   | "error";
+
+const MODES: { value: TranslationMode; label: string }[] = [
+  { value: "learning", label: "Learning" },
+  { value: "immersion", label: "Immersion" },
+  { value: "assisted", label: "Assisted" },
+];
 
 export default function PracticePage() {
   const params = useParams<{ textId: string }>();
@@ -32,13 +44,20 @@ export default function PracticePage() {
   const [chunk, setChunk] = useState<ChunkDTO | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chunkSummary, setChunkSummary] = useState<{ wpm: number; accuracy: number } | null>(null);
-  const [lastTranslation, setLastTranslation] = useState<string | null>(null);
+  const [translationMode, setTranslationMode] = useState<TranslationMode>("learning");
+  const [lastCompletedSentenceId, setLastCompletedSentenceId] = useState<string | null>(null);
+  const [revealedSentenceId, setRevealedSentenceId] = useState<string | null>(null);
   const [errorWord, setErrorWord] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (hasHydrated && !token) router.replace("/login");
   }, [hasHydrated, token, router]);
+
+  useEffect(() => {
+    if (!hasHydrated || !token) return;
+    api.getSettings().then((s) => setTranslationMode(s.translation_mode));
+  }, [hasHydrated, token]);
 
   const loadChunk = useCallback(async (currentText: TextDTO) => {
     if (currentText.has_translation && currentText.alignment_status === "needs_review") {
@@ -96,11 +115,11 @@ export default function PracticePage() {
   const handleSentenceComplete = useCallback(
     (sentenceId: string, endIndex: number) => {
       if (!text || !chunk) return;
-      const sentence = chunk.sentences.find((s) => s.id === sentenceId);
-      setLastTranslation(sentence?.translation ?? null);
+      setLastCompletedSentenceId(sentenceId);
+      if (translationMode === "learning") setRevealedSentenceId(sentenceId);
       api.updateProgress(text.id, chunk.index, endIndex).catch(() => {});
     },
-    [text, chunk]
+    [text, chunk, translationMode]
   );
 
   const handleWordError = useCallback((word: string) => {
@@ -130,8 +149,36 @@ export default function PracticePage() {
 
   useEffect(() => {
     inputRef.current?.focus();
-    setLastTranslation(null);
-  }, [chunk]);
+    setLastCompletedSentenceId(null);
+    setRevealedSentenceId(null);
+    // Only reset when a genuinely new chunk loads -- `chunk`'s object identity also
+    // changes on local optimistic updates (grammar note / phrase edits), which must
+    // NOT wipe the currently-revealed/targeted sentence.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chunk?.id]);
+
+  function handleModeChange(mode: TranslationMode) {
+    setTranslationMode(mode);
+    api.updateSettings(mode).catch(() => {});
+  }
+
+  function updateSentenceInChunk(sentenceId: string, update: (s: ChunkDTO["sentences"][number]) => ChunkDTO["sentences"][number]) {
+    setChunk((prev) =>
+      prev ? { ...prev, sentences: prev.sentences.map((s) => (s.id === sentenceId ? update(s) : s)) } : prev
+    );
+  }
+
+  function handleGrammarNoteSaved(sentenceId: string, note: string | null) {
+    updateSentenceInChunk(sentenceId, (s) => ({ ...s, grammar_note: note }));
+  }
+
+  function handlePhraseAdded(sentenceId: string, phrase: PhraseDTO) {
+    updateSentenceInChunk(sentenceId, (s) => ({ ...s, phrases: [...s.phrases, phrase] }));
+  }
+
+  function handlePhraseDeleted(sentenceId: string, phraseId: string) {
+    updateSentenceInChunk(sentenceId, (s) => ({ ...s, phrases: s.phrases.filter((p) => p.id !== phraseId) }));
+  }
 
   if (loadState === "loading") return <CenteredMessage text="Cargando..." />;
   if (loadState === "processing") return <CenteredMessage text="Procesando texto..." />;
@@ -164,6 +211,12 @@ export default function PracticePage() {
   const progressPercent = targetText.length ? (currentIndex / targetText.length) * 100 : 0;
   const isChunkDone = currentIndex >= targetText.length && targetText.length > 0;
 
+  const currentSentenceId = findSentenceIdAt(sentenceRanges, currentIndex);
+  const targetSentenceId =
+    translationMode === "assisted" ? currentSentenceId ?? lastCompletedSentenceId : lastCompletedSentenceId;
+  const targetSentence = chunk?.sentences.find((s) => s.id === targetSentenceId) ?? null;
+  const isRevealed = targetSentenceId !== null && targetSentenceId === revealedSentenceId;
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6">
       <input
@@ -181,7 +234,24 @@ export default function PracticePage() {
       />
 
       <div className="w-full max-w-3xl cursor-text" onClick={() => inputRef.current?.focus()}>
-        <TypingStats wpm={liveWpm} accuracy={liveAccuracy} progressPercent={progressPercent} />
+        <div className="flex items-center justify-between mb-2">
+          <TypingStats wpm={liveWpm} accuracy={liveAccuracy} progressPercent={progressPercent} />
+          <div className="flex gap-1 text-xs">
+            {MODES.map((m) => (
+              <button
+                key={m.value}
+                onClick={() => handleModeChange(m.value)}
+                className={
+                  translationMode === m.value
+                    ? "bg-white text-black rounded px-2 py-1"
+                    : "text-gray-500 hover:text-white px-2 py-1"
+                }
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {isChunkDone && chunkSummary ? (
           <ChunkCompleteSummary
@@ -192,7 +262,21 @@ export default function PracticePage() {
         ) : (
           <>
             <TypingText targetText={targetText} charStates={charStates} currentIndex={currentIndex} />
-            <TranslationPanel translation={lastTranslation} />
+            <TranslationPanel
+              translation={targetSentence?.translation ?? null}
+              mode={translationMode}
+              revealed={isRevealed}
+              onReveal={() => targetSentenceId && setRevealedSentenceId(targetSentenceId)}
+            />
+            {targetSentence && (
+              <SentenceInfoPanel
+                textId={textId}
+                sentence={targetSentence}
+                onGrammarNoteSaved={handleGrammarNoteSaved}
+                onPhraseAdded={handlePhraseAdded}
+                onPhraseDeleted={handlePhraseDeleted}
+              />
+            )}
           </>
         )}
       </div>

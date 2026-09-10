@@ -68,10 +68,16 @@ class Sentence(Base):
     )
     index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(SAText, nullable=False)
+    # User-authored grammar note (spec section 18's grammar_notes) -- no AI/generation
+    # involved, same principle as Text.translation_content: the user is the source.
+    grammar_note: Mapped[str | None] = mapped_column(SAText, nullable=True)
 
     chunk: Mapped["TextChunk"] = relationship(back_populates="sentences")
     translation_links: Mapped[list["SentenceTranslationLink"]] = relationship(
         back_populates="english_sentence", cascade="all, delete-orphan"
+    )
+    phrases: Mapped[list["SentencePhrase"]] = relationship(
+        back_populates="sentence", cascade="all, delete-orphan", order_by="SentencePhrase.created_at"
     )
 
 
@@ -109,3 +115,22 @@ class SentenceTranslationLink(Base):
 
     english_sentence: Mapped["Sentence"] = relationship(back_populates="translation_links")
     translation_sentence: Mapped["TranslationSentence"] = relationship(back_populates="english_links")
+
+
+class SentencePhrase(Base):
+    """A user-authored 'important phrase' pair for a sentence (spec section 18's
+    important_phrases, e.g. "consistent practice" = "practica constante"). No AI or
+    generation involved -- the user writes both sides themselves, same principle as
+    Text.translation_content and Sentence.grammar_note."""
+
+    __tablename__ = "sentence_phrases"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    sentence_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sentences.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    english_phrase: Mapped[str] = mapped_column(String(255), nullable=False)
+    spanish_phrase: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    sentence: Mapped["Sentence"] = relationship(back_populates="phrases")

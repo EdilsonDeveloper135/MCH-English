@@ -64,8 +64,22 @@ async def get_chunk(db: AsyncSession, text_id: uuid.UUID, index: int) -> TextChu
         .options(
             selectinload(TextChunk.sentences)
             .selectinload(Sentence.translation_links)
-            .selectinload(SentenceTranslationLink.translation_sentence)
+            .selectinload(SentenceTranslationLink.translation_sentence),
+            selectinload(TextChunk.sentences).selectinload(Sentence.phrases),
         )
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_owned_sentence(db: AsyncSession, sentence_id: uuid.UUID, user_id: uuid.UUID, text_id: uuid.UUID) -> Sentence | None:
+    """Same ownership-check shape as api/dictation.py's _get_owned_sentence, scoped
+    additionally to one text since these routes nest under /texts/{text_id}/..."""
+    result = await db.execute(
+        select(Sentence)
+        .join(TextChunk, Sentence.chunk_id == TextChunk.id)
+        .join(Text, TextChunk.text_id == Text.id)
+        .options(selectinload(Sentence.phrases))
+        .where(Sentence.id == sentence_id, Text.id == text_id, Text.user_id == user_id)
     )
     return result.scalar_one_or_none()
 

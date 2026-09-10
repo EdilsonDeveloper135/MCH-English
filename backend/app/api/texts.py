@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
-from app.models.text import Sentence, Text
+from app.models.text import Sentence, SentencePhrase, Text
 from app.models.user import User
 from app.repositories import text_repository
 from app.schemas.texts import (
@@ -14,12 +14,16 @@ from app.schemas.texts import (
     AlignmentSentenceOut,
     AlignmentUpdate,
     ChunkOut,
+    GrammarNoteUpdate,
+    PhraseCreate,
+    PhraseOut,
     ProgressUpdate,
     SentenceOut,
     TextCreate,
     TextOut,
     TranslationUpdate,
 )
+from app.services import vocabulary_service
 from app.services.text_service import create_text
 from app.services.translation_service import realign_translation
 
@@ -51,6 +55,21 @@ def _sentence_translation(sentence: Sentence) -> str | None:
     if not linked:
         return None
     return " ".join(ts.content for ts in linked)
+
+
+def _to_sentence_out(sentence: Sentence, weak_words: set[str]) -> SentenceOut:
+    return SentenceOut(
+        id=str(sentence.id),
+        index=sentence.index,
+        content=sentence.content,
+        translation=_sentence_translation(sentence),
+        grammar_note=sentence.grammar_note,
+        phrases=[
+            PhraseOut(id=str(p.id), english_phrase=p.english_phrase, spanish_phrase=p.spanish_phrase)
+            for p in sentence.phrases
+        ],
+        difficult_words=vocabulary_service.compute_difficult_words(sentence.content, weak_words),
+    )
 
 
 async def _build_alignment_out(db: AsyncSession, text: Text) -> AlignmentOut:
@@ -135,16 +154,74 @@ async def get_chunk(
     if chunk is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chunk not found")
 
+    weak_words = await vocabulary_service.get_weak_word_set(db, current_user.id)
+
     return ChunkOut(
         id=str(chunk.id),
         index=chunk.index,
         word_count=chunk.word_count,
         total_chunks=len(text.chunks),
-        sentences=[
-            SentenceOut(id=str(s.id), index=s.index, content=s.content, translation=_sentence_translation(s))
-            for s in chunk.sentences
-        ],
+        sentences=[_to_sentence_out(s, weak_words) for s in chunk.sentences],
     )
+
+
+@router.patch("/{text_id}/sentences/{sentence_id}/grammar-note", response_model=GrammarNoteUpdate)
+async def update_grammar_note(
+    text_id: uuid.UUID,
+    sentence_id: uuid.UUID,
+    payload: GrammarNoteUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    sentence = await text_repository.get_owned_sentence(db, sentence_id, current_user.id, text_id)
+    if sentence is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sentence not found")
+
+    sentence.grammar_note = payload.grammar_note.strip() if payload.grammar_note else None
+    await db.commit()
+    return GrammarNoteUpdate(grammar_note=sentence.grammar_note)
+
+
+@router.post("/{text_id}/sentences/{sentence_id}/phrases", response_model=PhraseOut, status_code=status.HTTP_201_CREATED)
+async def add_phrase(
+    text_id: uuid.UUID,
+    sentence_id: uuid.UUID,
+    payload: PhraseCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    sentence = await text_repository.get_owned_sentence(db, sentence_id, current_user.id, text_id)
+    if sentence is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sentence not found")
+
+    phrase = SentencePhrase(
+        sentence_id=sentence.id,
+        english_phrase=payload.english_phrase.strip(),
+        spanish_phrase=payload.spanish_phrase.strip(),
+    )
+    db.add(phrase)
+    await db.commit()
+    return PhraseOut(id=str(phrase.id), english_phrase=phrase.english_phrase, spanish_phrase=phrase.spanish_phrase)
+
+
+@router.delete("/{text_id}/sentences/{sentence_id}/phrases/{phrase_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_phrase(
+    text_id: uuid.UUID,
+    sentence_id: uuid.UUID,
+    phrase_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    sentence = await text_repository.get_owned_sentence(db, sentence_id, current_user.id, text_id)
+    if sentence is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sentence not found")
+
+    phrase = next((p for p in sentence.phrases if p.id == phrase_id), None)
+    if phrase is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Phrase not found")
+
+    await db.delete(phrase)
+    await db.commit()
 
 
 @router.patch("/{text_id}/progress", response_model=TextOut)

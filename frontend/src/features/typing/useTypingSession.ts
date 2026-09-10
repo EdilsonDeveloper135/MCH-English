@@ -45,6 +45,14 @@ export function buildTargetText(sentences: TargetSentence[]): { text: string; se
   return { text, sentenceRanges };
 }
 
+/** Finds which sentence range a character position falls in (used to attribute a
+ * typing error to a sentence, and to know which sentence is currently being typed
+ * for Assisted-mode translation reveal). */
+export function findSentenceIdAt(sentenceRanges: SentenceRange[], position: number): string | null {
+  const range = sentenceRanges.find((r) => position >= r.start && position < r.end);
+  return range ? range.sentenceId : null;
+}
+
 function wordAtPosition(text: string, position: number): string {
   const before = text.slice(0, position + 1);
   const match = before.match(/[A-Za-z0-9']+$/);
@@ -105,13 +113,7 @@ export function useTypingSession({
     return () => clearInterval(interval);
   }, [startedAt, isComplete]);
 
-  const sentenceIdAt = useCallback(
-    (position: number): string | null => {
-      const range = sentenceRanges.find((r) => position >= r.start && position < r.end);
-      return range ? range.sentenceId : null;
-    },
-    [sentenceRanges]
-  );
+  const sentenceIdAt = useCallback((position: number) => findSentenceIdAt(sentenceRanges, position), [sentenceRanges]);
 
   const checkSentenceCompletion = useCallback(
     (position: number) => {

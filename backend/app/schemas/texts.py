@@ -31,11 +31,29 @@ class TextOut(BaseModel):
     created_at: datetime
 
 
+class PhraseOut(BaseModel):
+    id: str
+    english_phrase: str
+    spanish_phrase: str
+
+
+class PhraseCreate(BaseModel):
+    english_phrase: str = Field(min_length=1, max_length=255)
+    spanish_phrase: str = Field(min_length=1, max_length=255)
+
+
+class GrammarNoteUpdate(BaseModel):
+    grammar_note: str | None = Field(default=None, max_length=2000)
+
+
 class SentenceOut(BaseModel):
     id: str
     index: int
     content: str
     translation: str | None = None
+    grammar_note: str | None = None
+    phrases: list[PhraseOut] = []
+    difficult_words: list[str] = []
 
 
 class ChunkOut(BaseModel):
