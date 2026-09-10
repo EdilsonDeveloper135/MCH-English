@@ -38,6 +38,7 @@ export type TranslationMode = "learning" | "immersion" | "assisted";
 
 export interface UserSettingsDTO {
   translation_mode: TranslationMode;
+  daily_goal_minutes: number;
 }
 
 export interface AlignmentSentenceDTO {
@@ -188,4 +189,23 @@ export interface DictationAttemptDTO {
   accuracy: number;
   correct_words: number;
   incorrect_words: number;
+}
+
+export interface AchievementDTO {
+  id: string;
+  name: string;
+  description: string;
+  unlocked: boolean;
+}
+
+export interface GamificationOverviewDTO {
+  level: number;
+  total_xp: number;
+  xp_into_level: number;
+  xp_for_next_level: number;
+  current_streak: number;
+  longest_streak: number;
+  daily_goal_minutes: number;
+  practice_seconds_today: number;
+  achievements: AchievementDTO[];
 }

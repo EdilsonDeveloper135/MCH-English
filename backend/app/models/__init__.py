@@ -1,5 +1,6 @@
 from app.models.dictation import DictationAttempt, DictationAudio, DictationSession
 from app.models.dictionary import DictionaryEntry
+from app.models.gamification import UserAchievement
 from app.models.recall import RecallAttempt, RecallSession
 from app.models.settings import UserSettings
 from app.models.text import Sentence, SentencePhrase, SentenceTranslationLink, Text, TextChunk, TranslationSentence
@@ -25,4 +26,5 @@ __all__ = [
     "DictationAudio",
     "DictationSession",
     "DictationAttempt",
+    "UserAchievement",
 ]

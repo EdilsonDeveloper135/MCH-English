@@ -44,6 +44,9 @@ export default function ProgressPage() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-xl font-semibold text-white">Progress</h1>
         <div className="flex gap-4 text-sm text-gray-400">
+          <Link href="/gamification" className="hover:text-white">
+            Gamification
+          </Link>
           <Link href="/vocabulary" className="hover:text-white">
             Vocabulary
           </Link>

@@ -9,6 +9,7 @@ import type {
   DictationSessionDTO,
   DictionaryLookupDTO,
   ErrorInput,
+  GamificationOverviewDTO,
   HistoryPointDTO,
   OverviewStatsDTO,
   PhraseDTO,
@@ -123,11 +124,13 @@ export const api = {
 
   getSettings: () => request<UserSettingsDTO>("/settings"),
 
-  updateSettings: (translation_mode: TranslationMode) =>
+  updateSettings: (updates: { translation_mode?: TranslationMode; daily_goal_minutes?: number }) =>
     request<UserSettingsDTO>("/settings", {
       method: "PATCH",
-      body: JSON.stringify({ translation_mode }),
+      body: JSON.stringify(updates),
     }),
+
+  getGamificationOverview: () => request<GamificationOverviewDTO>("/gamification/overview"),
 
   updateGrammarNote: (textId: string, sentenceId: string, grammar_note: string | null) =>
     request<{ grammar_note: string | null }>(`/texts/${textId}/sentences/${sentenceId}/grammar-note`, {

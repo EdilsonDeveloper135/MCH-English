@@ -159,7 +159,7 @@ export default function PracticePage() {
 
   function handleModeChange(mode: TranslationMode) {
     setTranslationMode(mode);
-    api.updateSettings(mode).catch(() => {});
+    api.updateSettings({ translation_mode: mode }).catch(() => {});
   }
 
   function updateSentenceInChunk(sentenceId: string, update: (s: ChunkDTO["sentences"][number]) => ChunkDTO["sentences"][number]) {

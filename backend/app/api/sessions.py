@@ -9,7 +9,7 @@ from app.models.typing_session import TypingSession
 from app.models.user import User
 from app.repositories import session_repository, text_repository
 from app.schemas.sessions import SessionCreate, SessionFinish, SessionOut
-from app.services import vocabulary_service
+from app.services import gamification_service, vocabulary_service
 from app.services.typing_service import calculate_accuracy, calculate_wpm
 
 router = APIRouter()
@@ -95,5 +95,6 @@ async def finish_session(
     session_sentences = await session_repository.get_sentences_for_session(db, session)
     error_words = {err.word.lower() for err in payload.errors if err.word}
     await vocabulary_service.record_session_words(db, current_user.id, session_sentences, error_words)
+    await gamification_service.check_and_unlock_achievements(db, current_user.id)
 
     return _to_session_out(session)
