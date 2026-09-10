@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAuthStore } from "@/stores/authStore";
 import { api } from "@/services/api";
 import { LevelBar } from "@/features/gamification/LevelBar";
@@ -45,20 +44,10 @@ export default function GamificationPage() {
 
   return (
     <div className="min-h-screen px-6 py-10 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-xl font-semibold text-white">Gamification</h1>
-        <div className="flex gap-4 text-sm text-gray-400">
-          <Link href="/progress" className="hover:text-white">
-            Progress
-          </Link>
-          <Link href="/library" className="hover:text-white">
-            Library
-          </Link>
-        </div>
-      </div>
+      <h1 className="text-xl font-semibold text-white mb-8">Gamification</h1>
 
       {!overview ? (
-        <p className="text-gray-500 text-sm">Cargando...</p>
+        <p className="text-gray-400 text-sm">Cargando...</p>
       ) : (
         <div className="space-y-8">
           <LevelBar
@@ -72,7 +61,7 @@ export default function GamificationPage() {
           <div className="border border-gray-800 rounded p-4">
             <div className="flex items-baseline justify-between mb-2">
               <p className="text-sm text-gray-400">Objetivo diario</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-400">
                 {Math.round(overview.practice_seconds_today / 60)} / {overview.daily_goal_minutes} min
               </p>
             </div>
@@ -85,7 +74,11 @@ export default function GamificationPage() {
               />
             </div>
             <div className="flex gap-2">
+              <label htmlFor="daily-goal-minutes" className="sr-only">
+                Objetivo diario en minutos
+              </label>
               <input
+                id="daily-goal-minutes"
                 type="number"
                 min={1}
                 max={480}
@@ -101,7 +94,7 @@ export default function GamificationPage() {
           </div>
 
           <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">Logros</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">Logros</p>
             <AchievementGrid achievements={overview.achievements} />
           </div>
         </div>

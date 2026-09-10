@@ -1,4 +1,4 @@
-from app.services.recall_service import score_attempt, score_missing_words_attempt, select_blanks
+from app.services.recall_service import score_attempt, select_blanks
 
 
 def test_select_blanks_prioritizes_weak_words():
@@ -52,15 +52,15 @@ def test_score_attempt_extra_typed_words():
     assert (correct, incorrect) == (3, 1)
 
 
-def test_score_missing_words_attempt_no_separator_between_blanks():
-    # blanks are concatenated with no space (disjoint fields, not a phrase) -- must
-    # be sliced by length, not split on whitespace
-    correct, incorrect = score_missing_words_attempt(["absolutely", "beautiful"], "absolutelybeautiful")
+def test_score_attempt_missing_words_style_space_separated_blanks():
+    # Missing Words rounds join blanked words with a single space (see
+    # buildBlankTargetText on the frontend) and score them with this same
+    # whole-sentence scorer -- typing the words correctly with a space between them
+    # (the natural instinct) scores as fully correct.
+    correct, incorrect = score_attempt("absolutely beautiful", "absolutely beautiful")
     assert (correct, incorrect) == (2, 0)
 
 
-def test_score_missing_words_attempt_one_wrong():
-    # same total length as the expected words (backspacing always nets out to the
-    # target length in real usage) but a transposed typo in the second word
-    correct, incorrect = score_missing_words_attempt(["absolutely", "beautiful"], "absolutelybeatiuful")
+def test_score_attempt_missing_words_style_one_wrong():
+    correct, incorrect = score_attempt("absolutely beautiful", "absolutely beatiuful")
     assert (correct, incorrect) == (1, 1)

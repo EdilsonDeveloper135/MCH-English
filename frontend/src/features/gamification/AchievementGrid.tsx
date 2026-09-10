@@ -6,10 +6,12 @@ export function AchievementGrid({ achievements }: { achievements: AchievementDTO
       {achievements.map((a) => (
         <div
           key={a.id}
-          className={`border rounded p-4 ${a.unlocked ? "border-gray-800" : "border-gray-900 opacity-40"}`}
+          className={`border rounded p-4 ${a.unlocked ? "border-gray-800" : "border-gray-900 bg-gray-950/40"}`}
         >
-          <p className={`text-sm ${a.unlocked ? "text-white" : "text-gray-600"}`}>{a.name}</p>
-          <p className="text-xs text-gray-500 mt-1">{a.description}</p>
+          <p className={`text-sm ${a.unlocked ? "text-white" : "text-gray-400"}`}>
+            {a.unlocked ? a.name : `🔒 ${a.name}`}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">{a.description}</p>
         </div>
       ))}
     </div>

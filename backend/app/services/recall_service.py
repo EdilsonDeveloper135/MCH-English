@@ -73,24 +73,6 @@ def score_attempt(expected: str, typed: str) -> tuple[int, int]:
     return correct, incorrect
 
 
-def score_missing_words_attempt(expected_words: list[str], typed: str) -> tuple[int, int]:
-    """Missing Words concatenates the blanked words with no separator (they're
-    disjoint fields, not a continuous phrase -- see buildBlankTargetText on the
-    frontend), so scoring slices `typed` by each expected word's length instead of
-    splitting on whitespace."""
-    correct = 0
-    incorrect = 0
-    offset = 0
-    for word in expected_words:
-        segment = typed[offset : offset + len(word)]
-        offset += len(word)
-        if segment == word:
-            correct += 1
-        else:
-            incorrect += 1
-    return correct, incorrect
-
-
 async def build_missing_words_rounds(db: AsyncSession, user_id: uuid.UUID, text: Text) -> list[MissingWordsRound]:
     sentences = await text_repository.get_ordered_sentences(db, text.id)
     # get_weak_words(limit=50) returns the N lowest-mastery words regardless of how

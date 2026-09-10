@@ -76,7 +76,11 @@ export function AudioPlayer({ sentenceId }: AudioPlayerProps) {
       >
         Repetir
       </button>
+      <label htmlFor="playback-speed" className="sr-only">
+        Velocidad de reproduccion
+      </label>
       <select
+        id="playback-speed"
         value={speed}
         onChange={(e) => setSpeed(parseFloat(e.target.value))}
         className="bg-gray-900 border border-gray-800 rounded px-2 py-2 text-sm text-white"

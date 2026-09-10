@@ -3,7 +3,7 @@
 import type { CharStatus } from "@/features/typing/useTypingSession";
 
 const STATE_CLASSES: Record<CharStatus, string> = {
-  pending: "text-gray-600",
+  pending: "text-gray-400",
   correct: "text-white",
   incorrect: "text-red-500 bg-red-500/10",
 };

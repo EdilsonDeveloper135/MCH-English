@@ -11,7 +11,7 @@ export function LevelBar({ level, xpIntoLevel, xpForNextLevel }: LevelBarProps) 
     <div className="border border-gray-800 rounded p-4">
       <div className="flex items-baseline justify-between mb-2">
         <p className="text-2xl text-white">Nivel {level}</p>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-400">
           {xpIntoLevel} / {xpForNextLevel} XP
         </p>
       </div>

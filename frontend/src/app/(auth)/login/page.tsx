@@ -39,7 +39,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-6">
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
         <h1 className="text-2xl font-semibold text-white mb-6">Iniciar sesion</h1>
+        <label htmlFor="login-email" className="sr-only">
+          Email
+        </label>
         <input
+          id="login-email"
           type="email"
           required
           placeholder="Email"
@@ -47,7 +51,11 @@ export default function LoginPage() {
           onChange={(e) => setEmail(e.target.value)}
           className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-600"
         />
+        <label htmlFor="login-password" className="sr-only">
+          Contrasena
+        </label>
         <input
+          id="login-password"
           type="password"
           required
           placeholder="Contrasena"
@@ -63,7 +71,7 @@ export default function LoginPage() {
         >
           {loading ? "Entrando..." : "Entrar"}
         </button>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-400">
           No tenes cuenta?{" "}
           <Link href="/register" className="text-white underline">
             Registrate

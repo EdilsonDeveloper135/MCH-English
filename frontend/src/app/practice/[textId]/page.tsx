@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { api } from "@/services/api";
 import type { ChunkDTO, PhraseDTO, TextDTO, TranslationMode } from "@/types";
 import { TypingText } from "@/features/typing/TypingText";
+import { TypingCaptureInput } from "@/features/typing/TypingCaptureInput";
 import { TypingStats } from "@/features/typing/TypingStats";
 import { TranslationPanel } from "@/features/typing/TranslationPanel";
 import { SentenceInfoPanel } from "@/features/typing/SentenceInfoPanel";
@@ -145,7 +146,7 @@ export default function PracticePage() {
 
   const initialIndex = text && chunk && text.current_chunk_index === chunk.index ? text.current_character_index : 0;
 
-  const { charStates, currentIndex, handleKeyDown, liveWpm, liveAccuracy } = useTypingSession({
+  const { charStates, currentIndex, handleKeyDown, handleInput, liveWpm, liveAccuracy } = useTypingSession({
     targetText,
     sentenceRanges,
     initialIndex,
@@ -226,19 +227,7 @@ export default function PracticePage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6">
-      <input
-        ref={inputRef}
-        className="opacity-0 absolute h-0 w-0 pointer-events-none"
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        onKeyDown={handleKeyDown}
-        onChange={(e) => {
-          e.target.value = "";
-        }}
-        onBlur={() => inputRef.current?.focus()}
-      />
+      <TypingCaptureInput inputRef={inputRef} onKeyDown={handleKeyDown} onInput={handleInput} />
 
       <div className="w-full max-w-3xl cursor-text" onClick={() => inputRef.current?.focus()}>
         <div className="flex items-center justify-between mb-2">
@@ -251,7 +240,7 @@ export default function PracticePage() {
                 className={
                   translationMode === m.value
                     ? "bg-white text-black rounded px-2 py-1"
-                    : "text-gray-500 hover:text-white px-2 py-1"
+                    : "text-gray-400 hover:text-white px-2 py-1"
                 }
               >
                 {m.label}

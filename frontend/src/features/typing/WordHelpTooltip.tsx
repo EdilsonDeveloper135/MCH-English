@@ -36,7 +36,7 @@ export function WordHelpTooltip({ word }: WordHelpTooltipProps) {
   return (
     <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-gray-900 border border-gray-800 text-sm text-gray-200 px-3 py-2 rounded shadow-lg">
       <span className="text-white font-mono">{word}</span>
-      <span className="text-gray-500 mx-2">→</span>
+      <span className="text-gray-400 mx-2">→</span>
       <span>{translations}</span>
     </div>
   );

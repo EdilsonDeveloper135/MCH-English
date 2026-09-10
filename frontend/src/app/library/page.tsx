@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAuthStore } from "@/stores/authStore";
 import { api } from "@/services/api";
 import type { AlignmentStatus, ChunkMode, TextDTO } from "@/types";
@@ -24,7 +23,6 @@ export default function LibraryPage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
-  const logout = useAuthStore((s) => s.logout);
 
   const [texts, setTexts] = useState<TextDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,29 +80,24 @@ export default function LibraryPage() {
 
   return (
     <div className="min-h-screen px-6 py-10 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-xl font-semibold text-white">Library</h1>
-        <div className="flex gap-4 text-sm text-gray-400">
-          <Link href="/vocabulary" className="hover:text-white">
-            Vocabulary
-          </Link>
-          <Link href="/progress" className="hover:text-white">
-            Progress
-          </Link>
-          <button onClick={logout} className="hover:text-white">
-            Salir
-          </button>
-        </div>
-      </div>
+      <h1 className="text-xl font-semibold text-white mb-8">Library</h1>
 
       <form onSubmit={handleCreate} className="space-y-3 mb-10 border border-gray-800 rounded p-4">
+        <label htmlFor="text-title" className="sr-only">
+          Titulo
+        </label>
         <input
+          id="text-title"
           placeholder="Titulo"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-600"
         />
+        <label htmlFor="text-content" className="sr-only">
+          Texto en ingles
+        </label>
         <textarea
+          id="text-content"
           required
           placeholder="Pega aqui el texto en ingles..."
           value={content}
@@ -112,7 +105,11 @@ export default function LibraryPage() {
           rows={6}
           className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-600"
         />
+        <label htmlFor="text-translation" className="sr-only">
+          Traduccion completa al espanol
+        </label>
         <textarea
+          id="text-translation"
           placeholder="Traduccion completa al espanol (opcional) - la usaremos como referencia oficial, sin IA"
           value={translation}
           onChange={(e) => setTranslation(e.target.value)}
@@ -120,7 +117,11 @@ export default function LibraryPage() {
           className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-gray-600"
         />
         <div className="flex items-center justify-between gap-4 flex-wrap">
+          <label htmlFor="chunk-mode" className="sr-only">
+            Modo de division
+          </label>
           <select
+            id="chunk-mode"
             value={chunkMode}
             onChange={(e) => setChunkMode(e.target.value as ChunkMode)}
             className="bg-gray-900 border border-gray-800 rounded px-3 py-2 text-white text-sm"
@@ -143,16 +144,16 @@ export default function LibraryPage() {
       </form>
 
       {loading ? (
-        <p className="text-gray-500 text-sm">Cargando...</p>
+        <p className="text-gray-400 text-sm">Cargando...</p>
       ) : texts.length === 0 ? (
-        <p className="text-gray-500 text-sm">Todavia no agregaste ningun texto.</p>
+        <p className="text-gray-400 text-sm">Todavia no agregaste ningun texto.</p>
       ) : (
         <ul className="space-y-3">
           {texts.map((t) => (
             <li key={t.id} className="border border-gray-800 rounded p-4 flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-white truncate">{t.title}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-400">
                   {t.status === "ready"
                     ? `${t.word_count} palabras · ${t.progress_percent}%${
                         t.has_translation ? ` · traduccion ${ALIGNMENT_LABEL[t.alignment_status]}` : ""
@@ -186,7 +187,7 @@ export default function LibraryPage() {
                     Dictation
                   </button>
                 )}
-                <button onClick={() => handleDelete(t.id)} className="text-gray-500 hover:text-red-500">
+                <button onClick={() => handleDelete(t.id)} className="text-gray-400 hover:text-red-500">
                   Eliminar
                 </button>
               </div>

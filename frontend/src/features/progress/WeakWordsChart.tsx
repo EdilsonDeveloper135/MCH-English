@@ -23,7 +23,7 @@ export function WeakWordsChart({ items }: WeakWordsChartProps) {
 
   return (
     <div className="border border-gray-800 rounded p-4">
-      <p className="text-xs text-gray-500 mb-3">Palabras mas dificiles</p>
+      <p className="text-xs text-gray-400 mb-3">Palabras mas dificiles</p>
       {weak.length === 0 ? (
         <EmptyState />
       ) : (
@@ -40,7 +40,7 @@ export function WeakWordsChart({ items }: WeakWordsChartProps) {
                   }}
                 />
               </div>
-              <span className="text-xs text-gray-500 w-10 text-right">{Math.round(item.mastery_score)}%</span>
+              <span className="text-xs text-gray-400 w-10 text-right">{Math.round(item.mastery_score)}%</span>
             </div>
           ))}
         </div>

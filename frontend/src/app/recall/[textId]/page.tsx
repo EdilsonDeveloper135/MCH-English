@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { api, ApiError } from "@/services/api";
 import { TypingText } from "@/features/typing/TypingText";
+import { TypingCaptureInput } from "@/features/typing/TypingCaptureInput";
 import { MissingWordsText, buildBlankTargetText } from "@/features/recall/MissingWordsText";
 import { useTypingSession, type ChunkCompleteStats, type CharStatus } from "@/features/typing/useTypingSession";
 import type { ErrorInput, RecallMode, RecallRoundDTO, RecallSessionDTO, TextDTO } from "@/types";
@@ -163,7 +164,7 @@ export default function RecallPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6">
         <div className="w-full max-w-3xl">
-          <p className="text-gray-500 text-sm mb-6">
+          <p className="text-gray-400 text-sm mb-6">
             Recall · {mode === "missing_words" ? "Missing Words" : "Espanol → Ingles"} · {roundIndex + 1}/
             {session.rounds.length}
           </p>
@@ -234,7 +235,7 @@ function RecallRoundView({
     [targetText, fullSentence, sessionId, round, mode, onDone]
   );
 
-  const { charStates, currentIndex, handleKeyDown, liveAccuracy } = useTypingSession({
+  const { charStates, currentIndex, handleKeyDown, handleInput, liveAccuracy } = useTypingSession({
     targetText,
     sentenceRanges: [],
     onComplete: handleComplete,
@@ -246,19 +247,7 @@ function RecallRoundView({
 
   return (
     <div className="cursor-text" onClick={() => inputRef.current?.focus()}>
-      <input
-        ref={inputRef}
-        className="opacity-0 absolute h-0 w-0 pointer-events-none"
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        onKeyDown={handleKeyDown}
-        onChange={(e) => {
-          e.target.value = "";
-        }}
-        onBlur={() => inputRef.current?.focus()}
-      />
+      <TypingCaptureInput inputRef={inputRef} onKeyDown={handleKeyDown} onInput={handleInput} />
 
       {mode === "spanish_to_english" && round.spanish_prompt && (
         <p className="text-gray-400 text-sm mb-6">{round.spanish_prompt}</p>
@@ -275,7 +264,7 @@ function RecallRoundView({
         <TypingText targetText={targetText} charStates={charStates} currentIndex={currentIndex} hidePending />
       )}
 
-      <p className="text-gray-600 text-xs mt-6">{liveAccuracy}%</p>
+      <p className="text-gray-400 text-xs mt-6">{liveAccuracy}%</p>
     </div>
   );
 }
@@ -293,7 +282,7 @@ function RoundResult({
     <div className="py-10">
       <p className="font-mono text-lg text-white mb-1">{result.expected}</p>
       {result.typed !== null && result.typed !== result.expected && (
-        <p className="font-mono text-sm text-gray-500 mb-4">Escribiste: {result.typed}</p>
+        <p className="font-mono text-sm text-gray-400 mb-4">Escribiste: {result.typed}</p>
       )}
       <p className="text-white text-lg mb-2 mt-6">{result.accuracy}% de precision</p>
       <p className="text-gray-400 text-sm mb-8">

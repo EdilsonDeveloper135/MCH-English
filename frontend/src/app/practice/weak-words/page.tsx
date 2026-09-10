@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { api } from "@/services/api";
 import { TypingText } from "@/features/typing/TypingText";
+import { TypingCaptureInput } from "@/features/typing/TypingCaptureInput";
 import { TypingStats } from "@/features/typing/TypingStats";
 import { WordHelpTooltip } from "@/features/typing/WordHelpTooltip";
 import { buildTargetText, useTypingSession, type ChunkCompleteStats } from "@/features/typing/useTypingSession";
@@ -51,7 +52,7 @@ export default function WeakWordsPracticePage() {
     [session]
   );
 
-  const { charStates, currentIndex, handleKeyDown, liveWpm, liveAccuracy } = useTypingSession({
+  const { charStates, currentIndex, handleKeyDown, handleInput, liveWpm, liveAccuracy } = useTypingSession({
     targetText,
     sentenceRanges,
     onComplete: handleComplete,
@@ -79,19 +80,7 @@ export default function WeakWordsPracticePage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6">
-      <input
-        ref={inputRef}
-        className="opacity-0 absolute h-0 w-0 pointer-events-none"
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        onKeyDown={handleKeyDown}
-        onChange={(e) => {
-          e.target.value = "";
-        }}
-        onBlur={() => inputRef.current?.focus()}
-      />
+      <TypingCaptureInput inputRef={inputRef} onKeyDown={handleKeyDown} onInput={handleInput} />
 
       <div className="w-full max-w-3xl cursor-text" onClick={() => inputRef.current?.focus()}>
         <TypingStats wpm={liveWpm} accuracy={liveAccuracy} progressPercent={progressPercent} />

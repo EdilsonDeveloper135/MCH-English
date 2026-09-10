@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent as ReactFormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import type { ErrorInput } from "@/types";
 
 export type CharStatus = "pending" | "correct" | "incorrect";
@@ -127,45 +134,37 @@ export function useTypingSession({
     [sentenceRanges, onSentenceComplete]
   );
 
-  const handleKeyDown = useCallback(
-    (e: ReactKeyboardEvent<HTMLInputElement>) => {
-      if (isComplete) return;
+  const applyBackspace = useCallback(() => {
+    if (currentIndex === 0) return;
+    const prevIndex = currentIndex - 1;
+    const prevState = charStates[prevIndex];
 
-      if (e.key === "Backspace") {
-        e.preventDefault();
-        if (currentIndex === 0) return;
-        const prevIndex = currentIndex - 1;
-        const prevState = charStates[prevIndex];
+    const next = [...charStates];
+    next[prevIndex] = "pending";
+    setCharStates(next);
+    setCurrentIndex(prevIndex);
 
-        const next = [...charStates];
-        next[prevIndex] = "pending";
-        setCharStates(next);
-        setCurrentIndex(prevIndex);
+    // Undo whatever this character previously counted as, so retyping it doesn't
+    // double-count -- otherwise correct/incorrect totals (and the accuracy/WPM
+    // derived from them) inflate past what was actually typed.
+    if (prevState === "correct") {
+      setCorrectCount((c) => Math.max(0, c - 1));
+    } else if (prevState === "incorrect") {
+      setIncorrectCount((c) => Math.max(0, c - 1));
+      setErrors((prev) => {
+        const lastMatch = prev.map((err) => err.position).lastIndexOf(prevIndex);
+        if (lastMatch === -1) return prev;
+        return [...prev.slice(0, lastMatch), ...prev.slice(lastMatch + 1)];
+      });
+    }
+  }, [currentIndex, charStates]);
 
-        // Undo whatever this character previously counted as, so retyping it doesn't
-        // double-count -- otherwise correct/incorrect totals (and the accuracy/WPM
-        // derived from them) inflate past what was actually typed.
-        if (prevState === "correct") {
-          setCorrectCount((c) => Math.max(0, c - 1));
-        } else if (prevState === "incorrect") {
-          setIncorrectCount((c) => Math.max(0, c - 1));
-          setErrors((prev) => {
-            const lastMatch = prev.map((err) => err.position).lastIndexOf(prevIndex);
-            if (lastMatch === -1) return prev;
-            return [...prev.slice(0, lastMatch), ...prev.slice(lastMatch + 1)];
-          });
-        }
-        return;
-      }
-
-      if (e.key.length !== 1) return;
-      e.preventDefault();
-
+  const applyCharacter = useCallback(
+    (typedChar: string) => {
       const sessionStart = startedAt ?? Date.now();
       if (!startedAt) setStartedAt(sessionStart);
 
       const expected = targetText[currentIndex];
-      const typedChar = e.key;
       const isCorrect = typedChar === expected;
       const nextIndex = currentIndex + 1;
 
@@ -220,7 +219,6 @@ export function useTypingSession({
     },
     [
       currentIndex,
-      isComplete,
       targetText,
       startedAt,
       sentenceIdAt,
@@ -232,6 +230,49 @@ export function useTypingSession({
       onComplete,
       onWordError,
     ]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: ReactKeyboardEvent<HTMLInputElement>) => {
+      if (isComplete) return;
+
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        applyBackspace();
+        return;
+      }
+
+      if (e.key.length !== 1) return;
+      e.preventDefault();
+      applyCharacter(e.key);
+    },
+    [isComplete, applyBackspace, applyCharacter]
+  );
+
+  // Fallback path for touch/virtual keyboards (notably Android's Gboard) that don't
+  // report real `key` values on `keydown` -- they fire "Unidentified" instead, so
+  // handleKeyDown's `e.key.length !== 1` guard bails out without calling
+  // preventDefault(), and the browser goes on to actually insert the character into
+  // this always-emptied input, firing a native `input` event with the true typed
+  // text in `data`. Desktop and iOS Safari report proper `key` values on keydown, so
+  // there `preventDefault()` already suppresses the DOM mutation and this handler
+  // never fires for those keystrokes -- no double-counting.
+  const handleInput = useCallback(
+    (e: ReactFormEvent<HTMLInputElement>) => {
+      const target = e.currentTarget;
+      const native = e.nativeEvent as InputEvent;
+
+      if (!isComplete) {
+        if (native.inputType?.startsWith("delete")) {
+          applyBackspace();
+        } else if (native.data && native.data.length === 1) {
+          applyCharacter(native.data);
+        }
+      }
+
+      target.value = "";
+    },
+    [isComplete, applyBackspace, applyCharacter]
   );
 
   const totalTyped = correctCount + incorrectCount;
@@ -246,5 +287,6 @@ export function useTypingSession({
     liveWpm,
     liveAccuracy,
     handleKeyDown,
+    handleInput,
   };
 }

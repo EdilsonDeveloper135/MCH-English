@@ -17,7 +17,7 @@ export function TranslationPanel({ translation, mode, revealed, onReveal }: Tran
   }
 
   return (
-    <button onClick={onReveal} className="mt-6 text-sm text-gray-500 underline">
+    <button onClick={onReveal} className="mt-6 text-sm text-gray-400 underline">
       Ver traduccion
     </button>
   );

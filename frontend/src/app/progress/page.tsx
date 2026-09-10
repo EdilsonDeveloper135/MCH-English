@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAuthStore } from "@/stores/authStore";
 import { api } from "@/services/api";
 import { LineChartCard } from "@/features/progress/LineChartCard";
@@ -41,27 +40,14 @@ export default function ProgressPage() {
 
   return (
     <div className="min-h-screen px-6 py-10 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-xl font-semibold text-white">Progress</h1>
-        <div className="flex gap-4 text-sm text-gray-400">
-          <Link href="/gamification" className="hover:text-white">
-            Gamification
-          </Link>
-          <Link href="/vocabulary" className="hover:text-white">
-            Vocabulary
-          </Link>
-          <Link href="/library" className="hover:text-white">
-            Library
-          </Link>
-        </div>
-      </div>
+      <h1 className="text-xl font-semibold text-white mb-8">Progress</h1>
 
       {loading ? (
-        <p className="text-gray-500 text-sm">Cargando...</p>
+        <p className="text-gray-400 text-sm">Cargando...</p>
       ) : (
         <div className="space-y-10">
           <section>
-            <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">Typing</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">Typing</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <Stat label="WPM actual" value={stats.current_wpm} />
               <Stat label="WPM promedio" value={stats.average_wpm} />
@@ -73,7 +59,7 @@ export default function ProgressPage() {
           </section>
 
           <section>
-            <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">English</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">English</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <Stat label="Palabras encontradas" value={stats.words_encountered} />
               <Stat label="Palabras aprendidas" value={stats.words_learned} />
@@ -92,7 +78,7 @@ export default function ProgressPage() {
           </section>
 
           <section>
-            <p className="text-xs text-gray-500 uppercase tracking-wide mb-3">Graficos</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">Graficos</p>
             <div className="grid gap-4">
               <LineChartCard
                 title="WPM en el tiempo"
@@ -125,7 +111,7 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="border border-gray-800 rounded p-4">
       <p className="text-2xl text-white">{value}</p>
-      <p className="text-xs text-gray-500 mt-1">{label}</p>
+      <p className="text-xs text-gray-400 mt-1">{label}</p>
     </div>
   );
 }

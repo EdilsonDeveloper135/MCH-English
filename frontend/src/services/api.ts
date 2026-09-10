@@ -35,6 +35,21 @@ export class ApiError extends Error {
   }
 }
 
+/** FastAPI/Pydantic 422 responses carry `detail` as an array of validation error
+ * objects (`{msg, loc, type, ...}`), not a string -- passed straight through, it
+ * stringifies to "[object Object]" wherever it's rendered. Ordinary `HTTPException`
+ * responses already send a plain string, which passes through untouched. */
+function formatErrorDetail(detail: unknown, fallback: string): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => (item && typeof item === "object" && "msg" in item ? String(item.msg) : null))
+      .filter((msg): msg is string => Boolean(msg));
+    if (messages.length > 0) return messages.join("; ");
+  }
+  return fallback;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = useAuthStore.getState().token;
   const headers: Record<string, string> = {
@@ -49,7 +64,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     let detail = response.statusText;
     try {
       const body = await response.json();
-      detail = body.detail ?? detail;
+      detail = formatErrorDetail(body.detail, detail);
     } catch {
       // response had no JSON body; keep statusText
     }

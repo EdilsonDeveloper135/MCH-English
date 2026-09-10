@@ -97,7 +97,7 @@ export default function AlignmentReviewPage() {
     }
   }
 
-  if (!data) return <p className="text-gray-500 text-sm p-10">Cargando...</p>;
+  if (!data) return <p className="text-gray-400 text-sm p-10">Cargando...</p>;
 
   return (
     <div className="min-h-screen px-6 py-10 max-w-4xl mx-auto">
@@ -107,7 +107,7 @@ export default function AlignmentReviewPage() {
           Library
         </button>
       </div>
-      <p className="text-sm text-gray-500 mb-8">
+      <p className="text-sm text-gray-400 mb-8">
         Para cada oracion en ingles, indica el indice (o rango, ej. &quot;2-3&quot;) de la oracion en espanol
         que le corresponde. Dejalo vacio si esa oracion no tiene traduccion.
       </p>
@@ -121,7 +121,7 @@ export default function AlignmentReviewPage() {
               {s.content}
             </li>
           ))}
-          {data.spanish_sentences.length === 0 && <li className="text-gray-600">(sin oraciones en espanol)</li>}
+          {data.spanish_sentences.length === 0 && <li className="text-gray-400">(sin oraciones en espanol)</li>}
         </ul>
       </div>
 
@@ -133,14 +133,18 @@ export default function AlignmentReviewPage() {
               {s.content}
             </p>
             <div className="flex items-center gap-3 flex-wrap">
+              <label htmlFor={`align-input-${s.index}`} className="sr-only">
+                Indices de oraciones en espanol para la oracion {s.index}
+              </label>
               <input
+                id={`align-input-${s.index}`}
                 value={inputs[s.index] ?? ""}
                 onChange={(e) => setInputs((prev) => ({ ...prev, [s.index]: e.target.value }))}
                 placeholder="ej. 0 o 0-1 (vacio = sin traduccion)"
                 className="bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-white text-sm w-56 focus:outline-none focus:border-gray-600"
               />
               <p className="text-sm text-gray-400 flex-1 min-w-0">
-                {preview(inputs[s.index] ?? "") || <span className="text-gray-600">sin traduccion</span>}
+                {preview(inputs[s.index] ?? "") || <span className="text-gray-400">sin traduccion</span>}
               </p>
             </div>
           </div>

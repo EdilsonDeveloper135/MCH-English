@@ -237,7 +237,8 @@
 
 ## FASE 3 — UI/UX Y ACCESIBILIDAD (P2)
 
-### [ ] Tarea 3.1: Formateo legible de errores de validación de API
+### [x] Tarea 3.1: Formateo legible de errores de validación de API
+> ✅ **Completado 2026-09-10.** `api.ts` ahora tiene `formatErrorDetail()`: si `detail` es un array (respuestas 422 de Pydantic), extrae `item.msg` de cada entrada y las une con `"; "`; si es un string (HTTPException normal), lo pasa sin tocar. Verificado con `docker compose build frontend` (type-check limpio) y probando en el navegador un registro con contraseña de menos de 8 caracteres: el mensaje ahora se lee "String should have at least 8 characters" en vez de "[object Object]".
 - **Prioridad:** P2
 - **Área:** UI/UX & Frontend
 - **Archivos afectados:**
@@ -251,7 +252,8 @@
 
 ---
 
-### [ ] Tarea 3.2: Corregir mecánica de tipeo en Missing Words (Recall)
+### [x] Tarea 3.2: Corregir mecánica de tipeo en Missing Words (Recall)
+> ✅ **Completado 2026-09-10.** `MissingWordsText.tsx` reescrito con un modelo de segmentos: cada hueco expone sus letras tipeables más un segmento `"space"` sintético entre huecos consecutivos, así que ahora el usuario escribe un espacio real para pasar de un hueco al siguiente (igual que separaría las palabras leyendo la oración) en vez de tener que pegarlas. `buildBlankTargetText` concatena los huecos con un único espacio, y en el backend (`recall.py::create_recall_attempt`) `expected` se arma de la misma forma, reutilizando `recall_service.score_attempt` (comparación por palabra) para ambos modos — se eliminó `score_missing_words_attempt` por quedar duplicado, no por pérdida de funcionalidad. Verificado con `pytest` (57 tests, incluye los 2 nuevos casos de `score_attempt` estilo Missing Words) y con una sesión real en el navegador tipeando dos huecos consecutivos separados por espacio.
 - **Prioridad:** P2
 - **Área:** UI/UX & Lógica de Aprendizaje
 - **Archivos afectados:**
@@ -265,7 +267,8 @@
 
 ---
 
-### [ ] Tarea 3.3: Ajuste de contrastes y cumplimiento de accesibilidad WCAG 2.1 AA
+### [x] Tarea 3.3: Ajuste de contrastes y cumplimiento de accesibilidad WCAG 2.1 AA
+> ✅ **Completado 2026-09-10.** Calculé la luminancia relativa real de `gray-500`/`600`/`700` contra el fondo `bg-black`: `gray-600` (~2.77:1) y `gray-700` (~2.04:1) confirman los ratios 2.96:1/1.83:1 que reportó la auditoría, pero además `gray-500` (~4.35:1) también queda por debajo del mínimo 4.5:1 aunque la auditoría no lo mencionó explícitamente — el criterio de aceptación pide que *todos* los elementos de texto superen 4.5:1, así que además de los 3 archivos listados barrí **las 21 archivos del frontend** que usaban `text-gray-500/600/700` y los reemplacé por `text-gray-400` (~8.27:1, cumple con margen). En `AchievementGrid.tsx` el problema real no era solo el color sino el `opacity-40` aplicado a toda la tarjeta bloqueada, que multiplica el contraste del texto ya reemplazado y lo volvía a hundir por debajo del mínimo — lo reemplacé por un tinte de fondo (`bg-gray-950/40`) que no toca la opacidad del texto, y un prefijo "🔒" en el nombre para mantener la distinción visual bloqueado/desbloqueado. También agregué `<label htmlFor>` (con `sr-only` donde no había texto visible que ya cumpliera ese rol) a los inputs de login, register, alta de texto, alineación, nota de gramática, frases y velocidad de audio — los inputs ocultos de captura de teclas del motor de tipeo (Practice/Recall/Dictation) se dejaron sin label porque no son campos de formulario percibidos por el usuario, son un mecanismo de captura de teclado reemplazado visualmente por `TypingText`/`MissingWordsText`. Verificado con `docker compose build frontend` (type-check limpio), reinicio del contenedor dev, y en el navegador: pantalla de Gamification con logros bloqueados legibles, texto pendiente de Practice en `gray-400` claramente visible, y el input de email en `/login` ahora expone nombre accesible "Email" ligado por `label`/`htmlFor` (confirmado vía árbol de accesibilidad, no solo el `placeholder`).
 - **Prioridad:** P2
 - **Área:** UI/UX / Accesibilidad
 - **Archivos afectados:**
@@ -283,7 +286,8 @@
 
 ---
 
-### [ ] Tarea 3.4: Adaptación de interfaz para teclados móviles y virtuales
+### [x] Tarea 3.4: Adaptación de interfaz para teclados móviles y virtuales
+> ✅ **Completado 2026-09-10.** El input de captura ya no vive duplicado en 4 archivos (Practice, Dictation, Recall y también `practice/weak-words`, que usa el mismo motor de tipeo aunque no estaba en la lista original) -- se extrajo a un componente compartido `frontend/src/features/typing/TypingCaptureInput.tsx`. En desktop sigue siendo invisible y de tamaño 0 (`.focus()` se llama programáticamente); en un dispositivo táctil (media query `(pointer: coarse)`, sin necesidad de JS) se renderiza como una barra real de 48px de alto, con texto visible y placeholder "Toca aqui y escribi" -- un input de tamaño 0 nunca abre el teclado nativo en iOS/Android, tenga o no foco. Además, `useTypingSession.ts` ganó un segundo camino de entrada: refactoricé `handleKeyDown` en dos funciones puras (`applyBackspace`, `applyCharacter`) y agregué `handleInput`, que escucha el evento nativo `input` (via `onInput`) y lee `nativeEvent.inputType`/`.data` -- esto cubre el teclado de Android (Gboard y similares), que en muchos casos no reporta un `e.key` real en `keydown` (llega como `"Unidentified"`) pero sí dispara un `input` nativo con el caracter correcto. No hay doble conteo: cuando `keydown` sí trae un `e.key` utilizable (desktop, iOS Safari) ya se llama `preventDefault()`, lo que suprime el `input` nativo correspondiente. Verificado: (1) `docker compose build frontend` con type-check limpio; (2) sesión completa de escritura en desktop sin cambios de comportamiento (Backspace y caracteres correctos/incorrectos funcionan igual que antes); (3) viewport móvil emulado (375x812, `pointer: coarse`) confirmando que el input pasa de `opacity:0 h-0 w-0` a `opacity:1 position:static 327x48px pointer-events:auto`; (4) simulé el camino que toma Android disparando un `InputEvent` nativo (`insertText`/`deleteContentBackward`) directamente sobre el input sin pasar por `keydown`, y confirmé en pantalla que el caracter se procesó como correcto y que el Backspace subsiguiente lo revirtió -- confirma que `handleInput` funciona de punta a punta. No pude probar en hardware iOS/Android real ni en el simulador nativo (la tarea es sobre la app web, no una app iOS/Android nativa), así que la verificación de teclado virtual real queda sujeta a una prueba manual del usuario en un dispositivo físico como confirmación final.
 - **Prioridad:** P2
 - **Área:** UI/UX & Responsive
 - **Archivos afectados:**
@@ -298,7 +302,8 @@
 
 ---
 
-### [ ] Tarea 3.5: Componente de navegación global unificado (<AppHeader>)
+### [x] Tarea 3.5: Componente de navegación global unificado (<AppHeader>)
+> ✅ **Completado 2026-09-10.** Nuevo `frontend/src/components/AppHeader.tsx`, renderizado una única vez en `layout.tsx` (`<AppHeader />` antes de `{children}`, dentro del `<body>`) en vez de que cada página arme su propia fila de links a mano -- confirmé antes de tocar nada que Library/Vocabulary/Progress/Gamification tenían cada una un subconjunto distinto e inconsistente de esos 4 links (p.ej. Vocabulary no tenia "Salir" ni "Gamification", Library no tenia "Gamification"), exactamente el síntoma que describe la auditoría. El componente decide su propio contenido según la ruta (`usePathname`): oculto en `/`, `/login` y `/register`; en `/practice`, `/recall` y `/dictation` (sesiones de escritura a pantalla completa) muestra solo un link fijo "← Salir / Volver a Biblioteca"; en el resto de las páginas autenticadas muestra la barra completa (Library, Vocabulary, Progress, Gamification, Salir) con el link activo resaltado en blanco vía `aria-current="page"`. Ambas variantes son `sticky top-0` para que el link de salida siga "siempre disponible" incluso si la página tiene contenido más alto que la pantalla (esto era necesario: sin `sticky` el link de salida en Practice quedaba justo 40px por encima del fold en desktop). Elimine la fila de navegación duplicada (y los imports de `Link`/`logout` que quedaron sin uso) de `library/page.tsx`, `vocabulary/page.tsx`, `progress/page.tsx` y `gamification/page.tsx`, dejando solo el `<h1>` de cada página. Verificado con `docker compose build frontend` (type-check limpio), reinicio del contenedor dev, `pytest` (57 tests, sin tocar backend), y en el navegador: Library/Vocabulary muestran la barra completa con el link correcto resaltado, `/login` y `/register` no muestran ningún header, y `/practice/{id}` muestra "← Salir / Volver a Biblioteca" fijo arriba que efectivamente navega a `/library` al clickear.
 - **Prioridad:** P2
 - **Área:** UI/UX & Frontend
 - **Archivos afectados:**

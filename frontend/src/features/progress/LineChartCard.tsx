@@ -20,7 +20,7 @@ const PAD = 24;
 export function LineChartCard({ title, points, unit = "" }: LineChartCardProps) {
   return (
     <div className="border border-gray-800 rounded p-4">
-      <p className="text-xs text-gray-500 mb-3">{title}</p>
+      <p className="text-xs text-gray-400 mb-3">{title}</p>
       {points.length === 0 ? <EmptyState /> : <Chart points={points} unit={unit} />}
     </div>
   );

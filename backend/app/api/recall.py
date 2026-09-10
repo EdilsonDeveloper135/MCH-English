@@ -98,11 +98,13 @@ async def create_recall_attempt(
         expected_words = [
             sentence.content[max(0, b.start) : min(content_len, b.end)] for b in payload.blanks
         ]
+        # A single space between blanks, matching buildBlankTargetText on the
+        # frontend -- both `expected` and `payload.typed` are space-separated word
+        # sequences now, so the same whole-sentence scorer applies to both modes.
         expected = " ".join(expected_words)
-        correct_words, incorrect_words = recall_service.score_missing_words_attempt(expected_words, payload.typed)
     else:
         expected = sentence.content
-        correct_words, incorrect_words = recall_service.score_attempt(expected, payload.typed)
+    correct_words, incorrect_words = recall_service.score_attempt(expected, payload.typed)
 
     attempt = RecallAttempt(
         recall_session_id=session.id,
