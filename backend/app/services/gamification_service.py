@@ -107,9 +107,11 @@ ACHIEVEMENTS: list[Achievement] = [
 
 
 async def get_gamification_overview(db: AsyncSession, user_id: uuid.UUID) -> dict:
-    """Composes on top of statistics_service.get_overview without touching it, so
-    /statistics/* and the Progress page stay unaffected by anything here."""
-    overview = await statistics_service.get_overview(db, user_id)
+    """Composes on top of statistics_service.get_overview without changing its
+    return shape, so /statistics/* and the Progress page stay unaffected by
+    anything here."""
+    texts = await text_repository.list_by_user(db, user_id)
+    overview = await statistics_service.get_overview(db, user_id, texts=texts)
 
     active_dates = await gamification_repository.get_active_dates(db, user_id)
     today = datetime.now(timezone.utc).date()
@@ -119,7 +121,6 @@ async def get_gamification_overview(db: AsyncSession, user_id: uuid.UUID) -> dic
     word_xp = await gamification_repository.total_word_xp(db, user_id)
     level_info = compute_level(typing_xp + word_xp)
 
-    texts = await text_repository.list_by_user(db, user_id)
     texts_completed = sum(1 for t in texts if t.chunks and t.current_chunk_index >= len(t.chunks))
 
     return {

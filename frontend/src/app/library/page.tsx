@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { api } from "@/services/api";
+import { ConfirmModal } from "@/components/ConfirmModal";
 import type { AlignmentStatus, ChunkMode, TextDTO } from "@/types";
 
 const ALIGNMENT_LABEL: Record<AlignmentStatus, string> = {
@@ -32,6 +33,7 @@ export default function LibraryPage() {
   const [chunkMode, setChunkMode] = useState<ChunkMode>("normal");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const data = await api.listTexts();
@@ -78,9 +80,10 @@ export default function LibraryPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Eliminar este texto?")) return;
-    await api.deleteText(id);
+  async function confirmDelete() {
+    if (!deletingId) return;
+    await api.deleteText(deletingId);
+    setDeletingId(null);
     await refresh();
   }
 
@@ -193,7 +196,7 @@ export default function LibraryPage() {
                     Dictation
                   </button>
                 )}
-                <button onClick={() => handleDelete(t.id)} className="text-gray-400 hover:text-red-500">
+                <button onClick={() => setDeletingId(t.id)} className="text-gray-400 hover:text-red-500">
                   Eliminar
                 </button>
               </div>
@@ -201,6 +204,14 @@ export default function LibraryPage() {
           ))}
         </ul>
       )}
+
+      <ConfirmModal
+        open={deletingId !== null}
+        title="Eliminar este texto?"
+        description={texts.find((t) => t.id === deletingId)?.title}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingId(null)}
+      />
     </div>
   );
 }

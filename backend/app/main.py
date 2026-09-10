@@ -1,13 +1,59 @@
+import time
+import uuid
+
 import redis.asyncio as aioredis
-from fastapi import Depends, FastAPI
+import structlog
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api import auth, dictation, dictionary, gamification, recall, sessions, settings, statistics, texts, vocabulary
 from app.core.config import settings as app_settings
 from app.core.database import get_db
+
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.add_log_level,
+        structlog.processors.JSONRenderer(),
+    ],
+)
+logger = structlog.get_logger()
+
+# Docker's own healthcheck polls this every few seconds -- logging each hit as a
+# full request line would drown out everything else in the log stream.
+_UNLOGGED_PATHS = {"/health"}
+
+
+class RequestContextMiddleware(BaseHTTPMiddleware):
+    """Binds a request ID (the client's own X-Request-ID if it sent one, otherwise a
+    fresh one) to every structlog call made while handling this request, echoes it
+    back in the response header, and emits one structured JSON log line per request."""
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(request_id=request_id)
+
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = round((time.perf_counter() - start) * 1000, 2)
+
+        response.headers["X-Request-ID"] = request_id
+        if request.url.path not in _UNLOGGED_PATHS:
+            logger.info(
+                "request_completed",
+                method=request.method,
+                path=request.url.path,
+                status_code=response.status_code,
+                duration_ms=duration_ms,
+            )
+        return response
+
 
 app = FastAPI(title="MCH-English API")
 
@@ -18,6 +64,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestContextMiddleware)
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(texts.router, prefix="/texts", tags=["texts"])

@@ -477,7 +477,8 @@
 
 ## FASE 7 — LIMPIEZA Y OPTIMIZACIÓN FINAL (P3)
 
-### [ ] Tarea 7.1: Desduplicación de utilidades y consultas redundantes
+### [x] Tarea 7.1: Desduplicación de utilidades y consultas redundantes
+> ✅ **Completado 2026-09-10.** `reconstructTyped` (idéntica en `dictation/[textId]/page.tsx` y `recall/[textId]/page.tsx`) se movió a `frontend/src/features/typing/utils.ts`, ambas páginas ahora la importan de ahí y perdieron los imports de tipos (`CharStatus`, `ErrorInput`) que solo usaban para esa función. En `gamification_service.py`, `get_gamification_overview` llamaba a `text_repository.list_by_user` dos veces por request: una vez indirectamente adentro de `statistics_service.get_overview`, y otra vez de forma redundante para su propio cálculo de `texts_completed`. Le agregué a `statistics_service.get_overview` un parámetro opcional `texts: list[Text] | None = None` (si no se pasa, lo busca él mismo -- comportamiento identico para cualquier otro caller existente, incluido el endpoint `/statistics/overview`) y `gamification_service.py` ahora busca `texts` una sola vez arriba de todo y se lo pasa a `get_overview`, reusando la misma variable para su propio cálculo en vez de una segunda consulta idéntica. Verificado: `grep -rn "function reconstructTyped"` confirma una sola definición en todo el frontend (análisis estático, el criterio de aceptación literal); `pytest` completo (78/78, incluye el test de gamificación de la Tarea 5.2 que ejercita `get_gamification_overview` de punta a punta) y `npm run test` (22/22) + `docker compose build frontend` sin regresiones.
 - **Prioridad:** P3
 - **Área:** Calidad de Código
 - **Archivos afectados:**
@@ -492,7 +493,8 @@
 
 ---
 
-### [ ] Tarea 7.2: Modal accesible para acciones destructivas
+### [x] Tarea 7.2: Modal accesible para acciones destructivas
+> ✅ **Completado 2026-09-10.** Nuevo `frontend/src/components/ConfirmModal.tsx` sobre el elemento nativo `<dialog>` (`.showModal()`), que da foco automático y apilamiento por encima del resto de la página gratis. `library/page.tsx` reemplaza el `confirm("Eliminar este texto?")` bloqueante por `deletingId` (state) + este modal, mostrando el título del texto a borrar. Encontré y corregí un bug real durante la verificación: React 18 (la versión de este proyecto) no conecta `onCancel`/`onClose` de `<dialog>` a un listener real -- ese soporte recién llegó en React 19 -- así que la tecla Escape no cerraba nada pese a que el prop JSX estaba puesto; lo detecté probando Escape en el navegador real (no alcanzaba con el build/type-check, que no marca este tipo de error) y arreglé enganchando el evento nativo `cancel` a mano con `addEventListener` en un `useEffect` en vez de depender del prop JSX. Verificado con clicks reales via JavaScript sobre los botones (no solo el prop): abrir -> Escape cierra sin borrar; abrir -> Cancelar cierra sin borrar; abrir -> Eliminar borra el texto y cierra el modal. `grep` confirma cero usos de `window.confirm`/`confirm(` restantes en el frontend. `docker compose build frontend` sin errores y `npm run test` (22/22) sin regresiones.
 - **Prioridad:** P3
 - **Área:** UI/UX
 - **Archivos afectados:**
@@ -506,7 +508,8 @@
 
 ---
 
-### [ ] Tarea 7.3: Corrección de distorsión en gráficos SVG y Logging estructurado
+### [x] Tarea 7.3: Corrección de distorsión en gráficos SVG y Logging estructurado
+> ✅ **Completado 2026-09-10.** **SVG:** `LineChartCard.tsx` usa `preserveAspectRatio="none"` para que el gráfico llene el ancho del contenedor -- eso estira X e Y de forma independiente, y como un `<circle r={3}>` es geometría, no trazo, cualquier estiramiento no uniforme lo convierte en una elipse (el caso normal en mobile, donde el ancho real del contenedor casi nunca coincide con la proporción 600:160 del viewBox). Cambié los puntos a un truco estándar de SVG: `r` casi cero (`0.01`, no `0` exacto -- confirmé experimentalmente que un círculo de radio exactamente 0 no se pinta en absoluto, el navegador lo descarta por área nula) con `stroke` grueso y `vector-effect="non-scaling-stroke"`, que calcula el ancho del trazo *después* de deshacer la escala del padre, así que el punto queda redondo sin importar cuánto se estire el gráfico. Lo verifiqué de forma concluyente inyectando un componente de comparación directamente en la página real (no un mock aislado): con exactamente el mismo estiramiento no-uniforme que mide el navegador en `/progress` en mobile (375px de ancho, ~0.49x horizontal vs 1x vertical), el círculo viejo se veía como una elipse vertical alargada y el nuevo como un punto perfectamente redondo -- capturado con screenshots reales del gráfico real con datos reales (completé una sesión de tipeo de verdad para generar el punto). **Logging:** nuevo middleware `RequestContextMiddleware` en `main.py` (via `structlog`, agregado a `requirements.txt`): toma el `X-Request-ID` que mande el cliente o genera uno nuevo, lo ata al contexto de `structlog` para toda la duración del request, lo devuelve en la respuesta, y emite una línea de log JSON estructurada por request (`method`, `path`, `status_code`, `duration_ms`, `request_id`, `timestamp`, `level`) -- excepto `/health`, que el healthcheck de Docker pega cada pocos segundos y hubiera inundado el log de líneas idénticas. Verificado con `curl` real: la respuesta trae `x-request-id` en el header; un `X-Request-ID` enviado por el cliente se devuelve intacto (no se pisa); `docker compose logs backend` muestra la línea JSON completa con todos los campos esperados. `pytest` completo: **78/78** sin regresiones con el middleware activo.
 - **Prioridad:** P3
 - **Área:** UI/UX & Observabilidad
 - **Archivos afectados:**

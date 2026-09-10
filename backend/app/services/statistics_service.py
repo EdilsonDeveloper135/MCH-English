@@ -5,13 +5,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.dictation import DictationAttempt, DictationSession
 from app.models.recall import RecallAttempt, RecallSession
+from app.models.text import Text
 from app.repositories import session_repository, text_repository
 from app.services import vocabulary_service
 
 
-async def get_overview(db: AsyncSession, user_id: uuid.UUID) -> dict:
+async def get_overview(db: AsyncSession, user_id: uuid.UUID, texts: list[Text] | None = None) -> dict:
+    """`texts` can be passed in by a caller that already fetched it (e.g.
+    gamification_service, which needs the same list for its own computation) to
+    avoid running the identical query twice in one request."""
     stats = await session_repository.overview_for_user(db, user_id)
-    texts = await text_repository.list_by_user(db, user_id)
+    if texts is None:
+        texts = await text_repository.list_by_user(db, user_id)
 
     recall_result = await db.execute(
         select(func.coalesce(func.avg(RecallAttempt.accuracy), 0))

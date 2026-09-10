@@ -49,7 +49,25 @@ function Chart({ points, unit }: { points: Point[]; unit: string }) {
         vectorEffect="non-scaling-stroke"
       />
       {coords.map((c, i) => (
-        <circle key={i} cx={c.x} cy={c.y} r={3} fill="#fff">
+        // `preserveAspectRatio="none"` above stretches X and Y independently to
+        // fill the container, which turns a plain circle's radius into an ellipse
+        // on any screen whose aspect ratio doesn't match the viewBox's 600x160 (the
+        // common case on mobile). A near-zero-radius circle stroked with
+        // vector-effect="non-scaling-stroke" renders as a uniform dot instead --
+        // the stroke width is computed after undoing the parent's scale, so it
+        // stays round regardless of how unevenly the chart itself is stretched.
+        // (r must be a hair above 0, not exactly 0 -- a truly zero-area circle is
+        // dropped from rendering entirely instead of being stroked.)
+        <circle
+          key={i}
+          cx={c.x}
+          cy={c.y}
+          r={0.01}
+          stroke="#fff"
+          strokeWidth={6}
+          vectorEffect="non-scaling-stroke"
+          fill="none"
+        >
           <title>{`${c.label}: ${c.value}${unit}`}</title>
         </circle>
       ))}

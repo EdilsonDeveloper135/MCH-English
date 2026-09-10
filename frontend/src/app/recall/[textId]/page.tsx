@@ -7,20 +7,11 @@ import { api, ApiError } from "@/services/api";
 import { TypingText } from "@/features/typing/TypingText";
 import { TypingCaptureInput } from "@/features/typing/TypingCaptureInput";
 import { MissingWordsText, buildBlankTargetText } from "@/features/recall/MissingWordsText";
-import { useTypingSession, type ChunkCompleteStats, type CharStatus } from "@/features/typing/useTypingSession";
-import type { ErrorInput, RecallMode, RecallRoundDTO, RecallSessionDTO, TextDTO } from "@/types";
+import { useTypingSession, type ChunkCompleteStats } from "@/features/typing/useTypingSession";
+import { reconstructTyped } from "@/features/typing/utils";
+import type { RecallMode, RecallRoundDTO, RecallSessionDTO, TextDTO } from "@/types";
 
 type LoadState = "loading" | "pick-mode" | "running" | "summary" | "empty" | "error";
-
-function reconstructTyped(targetText: string, charStates: CharStatus[], errors: ErrorInput[]): string {
-  const lastTypedAtPosition = new Map<number, string>();
-  for (const err of errors) lastTypedAtPosition.set(err.position, err.typed_char);
-
-  return targetText
-    .split("")
-    .map((char, i) => (charStates[i] === "incorrect" ? (lastTypedAtPosition.get(i) ?? "?") : char))
-    .join("");
-}
 
 export default function RecallPage() {
   const params = useParams<{ textId: string }>();

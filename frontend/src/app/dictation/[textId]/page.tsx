@@ -7,20 +7,11 @@ import { api, ApiError } from "@/services/api";
 import { TypingText } from "@/features/typing/TypingText";
 import { TypingCaptureInput } from "@/features/typing/TypingCaptureInput";
 import { AudioPlayer } from "@/features/dictation/AudioPlayer";
-import { useTypingSession, type ChunkCompleteStats, type CharStatus } from "@/features/typing/useTypingSession";
-import type { DictationRoundDTO, DictationSessionDTO, ErrorInput } from "@/types";
+import { useTypingSession, type ChunkCompleteStats } from "@/features/typing/useTypingSession";
+import { reconstructTyped } from "@/features/typing/utils";
+import type { DictationRoundDTO, DictationSessionDTO } from "@/types";
 
 type LoadState = "loading" | "running" | "summary" | "empty" | "error";
-
-function reconstructTyped(targetText: string, charStates: CharStatus[], errors: ErrorInput[]): string {
-  const lastTypedAtPosition = new Map<number, string>();
-  for (const err of errors) lastTypedAtPosition.set(err.position, err.typed_char);
-
-  return targetText
-    .split("")
-    .map((char, i) => (charStates[i] === "incorrect" ? (lastTypedAtPosition.get(i) ?? "?") : char))
-    .join("");
-}
 
 export default function DictationPage() {
   const params = useParams<{ textId: string }>();
