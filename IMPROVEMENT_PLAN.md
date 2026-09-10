@@ -9,7 +9,8 @@
 
 ## FASE 0 — PROBLEMAS CRÍTICOS (P0)
 
-### [ ] Tarea 0.1: Proteger sesiones y estadísticas históricas ante borrado de textos
+### [x] Tarea 0.1: Proteger sesiones y estadísticas históricas ante borrado de textos
+> ✅ **Completado 2026-09-10.** `TypingSession.text_id/chunk_id`, `RecallSession.text_id`, `DictationSession.text_id` pasaron a `ondelete="SET NULL"` + `nullable=True`. Se detectó y corrigió un problema adicional no listado explícitamente: `RecallAttempt.sentence_id` y `DictationAttempt.sentence_id` (donde vive `correct_words`, la fuente real del XP de Recall/Dictation) también tenían `ondelete="CASCADE"` hacia `sentences.id` -- como borrar un texto cascadea hasta sus oraciones, el XP se habría perdido igual aunque la sesión sobreviviera. Se corrigieron también a `SET NULL`. Migración `87783de64709`. Verificado con script E2E: crear texto → sesión con XP → borrar texto → `/gamification/overview` mantiene el XP exacto, la sesión persiste con `text_id=null`.
 - **Prioridad:** P0
 - **Área:** Base de Datos / Integridad de Datos
 - **Archivos afectados:**
@@ -26,7 +27,8 @@
 
 ---
 
-### [ ] Tarea 0.2: Corregir bugs de asincronía y cálculo con Backspace en el motor de mecanografía
+### [x] Tarea 0.2: Corregir bugs de asincronía y cálculo con Backspace en el motor de mecanografía
+> ✅ **Completado 2026-09-10.** `finalCharStates` ahora se computa de forma directa sobre el closure (`[...charStates]` + mutación local) y se pasa a `setCharStates` como valor plano, sin depender del timing de un updater funcional. `Backspace` ahora decrementa `correctCount`/`incorrectCount` y elimina la entrada de `errors` correspondiente según el estado que tenía esa posición antes de borrarla. Verificado en navegador: escribir mal → Backspace → escribir bien → el payload real enviado a `PATCH /sessions/{id}` mostró `total_characters=12` exactos para un texto de 12 caracteres (antes del fix habría dado 13, con el keystroke fantasma sin descontar).
 - **Prioridad:** P0
 - **Área:** Frontend / Core Typing
 - **Archivos afectados:**
@@ -40,7 +42,8 @@
 
 ---
 
-### [ ] Tarea 0.3: Reemplazar passlib por bcrypt nativo para compatibilidad con Python 3.13+
+### [x] Tarea 0.3: Reemplazar passlib por bcrypt nativo para compatibilidad con Python 3.13+
+> ✅ **Completado 2026-09-10.** `security.py` usa `bcrypt.hashpw`/`bcrypt.checkpw` directamente (con truncamiento explícito a 72 bytes, el límite real del algoritmo). `passlib` eliminado de `requirements.txt`. Verificado que los hashes YA EXISTENTES generados por passlib (formato bcrypt estándar `$2b$...`) siguen verificando correctamente con `bcrypt.checkpw` -- no hace falta migración de datos ni fuerza a los usuarios a re-registrarse. `pytest` sin la advertencia de deprecación de `crypt`.
 - **Prioridad:** P0
 - **Área:** Backend / Seguridad y Compatibilidad
 - **Archivos afectados:**
@@ -64,7 +67,8 @@
 
 ---
 
-### [ ] Tarea 0.4: Corregir autorización rota (IDOR) en endpoints de intentos
+### [x] Tarea 0.4: Corregir autorización rota (IDOR) en endpoints de intentos
+> ✅ **Completado 2026-09-10.** `create_recall_attempt` y `create_dictation_attempt` ahora validan la oración vía join contra el `text_id` del usuario (reusando/extendiendo `text_repository.get_owned_sentence` y el `_get_owned_sentence` ya existente en `dictation.py`) en lugar de `db.get(Sentence, ...)` sin filtro. `create_session` valida que `chunk_id` pertenezca realmente a `text_id` vía nueva `text_repository.get_chunk_by_id`. Verificado con un ataque simulado real: usuario A intenta enviar un intento de Dictation/Recall contra el `sentence_id` de un texto privado de usuario B → HTTP 404 en ambos casos; sesión con `chunk_id` de otro texto → HTTP 404.
 - **Prioridad:** P0
 - **Área:** Backend / Seguridad
 - **Archivos afectados:**
@@ -80,7 +84,8 @@
 
 ---
 
-### [ ] Tarea 0.5: Limitar longitud máxima de texto para prevenir Denegación de Servicio (DoS)
+### [x] Tarea 0.5: Limitar longitud máxima de texto para prevenir Denegación de Servicio (DoS)
+> ✅ **Completado 2026-09-10.** `TextCreate.raw_content`/`translation_content` y `TranslationUpdate.translation_content` ahora tienen `max_length=100_000`, más un `field_validator` que rechaza contenido de solo espacios (no cubierto por `min_length`, que solo cuenta caracteres). Verificado: payload de ~120,000 caracteres → HTTP 422; `raw_content="     "` → HTTP 422.
 - **Prioridad:** P0
 - **Área:** Backend / Seguridad y Estabilidad
 - **Archivos afectados:**

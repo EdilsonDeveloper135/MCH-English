@@ -40,6 +40,10 @@ async def create_session(
     if text is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Text not found")
 
+    chunk = await text_repository.get_chunk_by_id(db, payload.chunk_id, payload.text_id)
+    if chunk is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chunk not found")
+
     session = await session_repository.create(
         db, user_id=current_user.id, text_id=payload.text_id, chunk_id=payload.chunk_id
     )

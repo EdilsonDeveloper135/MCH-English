@@ -17,8 +17,10 @@ class RecallSession(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    text_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("texts.id", ondelete="CASCADE"), nullable=False, index=True
+    # SET NULL (not CASCADE): the session row's own history should outlive the text
+    # it was practiced from if the text is later deleted.
+    text_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("texts.id", ondelete="SET NULL"), nullable=True, index=True
     )
     mode: Mapped[str] = mapped_column(String(30), nullable=False)  # missing_words | spanish_to_english
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -34,8 +36,11 @@ class RecallAttempt(Base):
     recall_session_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("recall_sessions.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    sentence_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sentences.id", ondelete="CASCADE"), nullable=False, index=True
+    # SET NULL (not CASCADE): expected/typed/accuracy/correct_words already live
+    # directly on this row (this is what gamification XP sums), so the attempt's
+    # history must survive the underlying sentence being deleted along with its text.
+    sentence_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sentences.id", ondelete="SET NULL"), nullable=True, index=True
     )
     expected: Mapped[str] = mapped_column(SAText, nullable=False)
     typed: Mapped[str] = mapped_column(SAText, nullable=False)

@@ -16,12 +16,15 @@ class TypingSession(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     # Null for a Weak Words review session, which draws sentences from across the
-    # user's whole library rather than belonging to one text/chunk.
+    # user's whole library rather than belonging to one text/chunk. Also goes null
+    # (via SET NULL, not CASCADE) if the source text/chunk is later deleted -- the
+    # session's own stats (correct_characters, wpm, accuracy, finished_at) live
+    # directly on this row, so history/XP/streaks survive the text's deletion.
     text_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("texts.id", ondelete="CASCADE"), nullable=True, index=True
+        UUID(as_uuid=True), ForeignKey("texts.id", ondelete="SET NULL"), nullable=True, index=True
     )
     chunk_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("text_chunks.id", ondelete="CASCADE"), nullable=True, index=True
+        UUID(as_uuid=True), ForeignKey("text_chunks.id", ondelete="SET NULL"), nullable=True, index=True
     )
     # Only set for a review session: the exact (real) sentence ids it was built from,
     # so vocabulary encounters can be recomputed at finish time.

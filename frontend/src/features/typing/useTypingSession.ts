@@ -135,12 +135,26 @@ export function useTypingSession({
         e.preventDefault();
         if (currentIndex === 0) return;
         const prevIndex = currentIndex - 1;
+        const prevState = charStates[prevIndex];
+
+        const next = [...charStates];
+        next[prevIndex] = "pending";
+        setCharStates(next);
         setCurrentIndex(prevIndex);
-        setCharStates((prev) => {
-          const next = [...prev];
-          next[prevIndex] = "pending";
-          return next;
-        });
+
+        // Undo whatever this character previously counted as, so retyping it doesn't
+        // double-count -- otherwise correct/incorrect totals (and the accuracy/WPM
+        // derived from them) inflate past what was actually typed.
+        if (prevState === "correct") {
+          setCorrectCount((c) => Math.max(0, c - 1));
+        } else if (prevState === "incorrect") {
+          setIncorrectCount((c) => Math.max(0, c - 1));
+          setErrors((prev) => {
+            const lastMatch = prev.map((err) => err.position).lastIndexOf(prevIndex);
+            if (lastMatch === -1) return prev;
+            return [...prev.slice(0, lastMatch), ...prev.slice(lastMatch + 1)];
+          });
+        }
         return;
       }
 
@@ -155,13 +169,14 @@ export function useTypingSession({
       const isCorrect = typedChar === expected;
       const nextIndex = currentIndex + 1;
 
-      let finalCharStates: CharStatus[] = charStates;
-      setCharStates((prev) => {
-        const next = [...prev];
-        next[currentIndex] = isCorrect ? "correct" : "incorrect";
-        finalCharStates = next;
-        return next;
-      });
+      // Computed directly from the closure value and passed to setCharStates as a
+      // plain value (not a functional updater) so `finalCharStates` is genuinely
+      // synchronous here -- relying on a functional updater's callback to run before
+      // this point is not guaranteed and previously left the last character "pending"
+      // in the stats handed to onComplete.
+      const finalCharStates: CharStatus[] = [...charStates];
+      finalCharStates[currentIndex] = isCorrect ? "correct" : "incorrect";
+      setCharStates(finalCharStates);
       setCurrentIndex(nextIndex);
 
       let finalCorrectCount = correctCount;

@@ -1,18 +1,36 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 ChunkMode = Literal["short", "normal", "long", "continuous"]
 TextStatus = Literal["pending", "processing", "ready", "failed"]
 AlignmentStatus = Literal["not_provided", "needs_review", "confirmed"]
 
+# ~20,000 words -- generous for a single practice text, but bounded so a huge payload
+# can't exhaust worker memory during chunking/alignment or flood the DB with rows.
+MAX_TEXT_LENGTH = 100_000
+
 
 class TextCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
-    raw_content: str = Field(min_length=1)
+    raw_content: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
     chunk_mode: ChunkMode = "normal"
-    translation_content: str | None = None
+    translation_content: str | None = Field(default=None, max_length=MAX_TEXT_LENGTH)
+
+    @field_validator("title", "raw_content")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
+
+    @field_validator("translation_content")
+    @classmethod
+    def _translation_not_blank(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("must not be blank")
+        return value
 
 
 class TextOut(BaseModel):
@@ -70,7 +88,14 @@ class ProgressUpdate(BaseModel):
 
 
 class TranslationUpdate(BaseModel):
-    translation_content: str = Field(min_length=1)
+    translation_content: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
+
+    @field_validator("translation_content")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
 
 
 class AlignmentSentenceOut(BaseModel):

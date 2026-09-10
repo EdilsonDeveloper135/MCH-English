@@ -71,6 +71,13 @@ async def get_chunk(db: AsyncSession, text_id: uuid.UUID, index: int) -> TextChu
     return result.scalar_one_or_none()
 
 
+async def get_chunk_by_id(db: AsyncSession, chunk_id: uuid.UUID, text_id: uuid.UUID) -> TextChunk | None:
+    """Confirms `chunk_id` actually belongs to `text_id` -- used to reject a session
+    creation request that names a chunk from a different (possibly not-owned) text."""
+    result = await db.execute(select(TextChunk).where(TextChunk.id == chunk_id, TextChunk.text_id == text_id))
+    return result.scalar_one_or_none()
+
+
 async def get_owned_sentence(db: AsyncSession, sentence_id: uuid.UUID, user_id: uuid.UUID, text_id: uuid.UUID) -> Sentence | None:
     """Same ownership-check shape as api/dictation.py's _get_owned_sentence, scoped
     additionally to one text since these routes nest under /texts/{text_id}/..."""

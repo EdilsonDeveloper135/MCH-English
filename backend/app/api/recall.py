@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.recall import RecallAttempt, RecallSession
-from app.models.text import Sentence
 from app.models.user import User
 from app.repositories import text_repository
 from app.schemas.recall import (
@@ -84,7 +83,11 @@ async def create_recall_attempt(
     if session is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recall session not found")
 
-    sentence = await db.get(Sentence, payload.sentence_id)
+    # IDOR guard: without this, any authenticated user could submit an attempt
+    # against a sentence_id belonging to a different user's private text.
+    if session.text_id is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sentence not found")
+    sentence = await text_repository.get_owned_sentence(db, payload.sentence_id, current_user.id, session.text_id)
     if sentence is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sentence not found")
 
