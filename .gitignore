@@ -25,3 +25,6 @@ postgres_data/
 .vscode/
 .idea/
 *.log
+
+# Internal agent-orchestration scratch (briefings/handoffs, not project docs)
+.agents/
