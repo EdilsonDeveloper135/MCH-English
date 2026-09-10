@@ -101,7 +101,8 @@
 
 ## FASE 1 — ESTABILIDAD Y SEGURIDAD (P1)
 
-### [ ] Tarea 1.1: Eliminar bucle N+1 en registro de palabras de vocabulario
+### [x] Tarea 1.1: Eliminar bucle N+1 en registro de palabras de vocabulario
+> ✅ **Completado 2026-09-10.** `record_session_words` reemplazó el loop `_get_or_create` por: una `SELECT ... WHERE word IN (...)` para leer el estado previo de las palabras ya trackeadas, cómputo en Python de los nuevos valores (reusando la función pura `mastery_score` ya testeada, sin duplicar su lógica de redondeo en SQL), y un único `INSERT ... ON CONFLICT (user_id, word) DO UPDATE` con todas las filas en un solo statement. Verificado con `echo=True`: una sesión de 3 palabras generó exactamente 2 queries (1 SELECT + 1 INSERT batched), sin importar la cantidad de palabras.
 - **Prioridad:** P1
 - **Área:** Base de Datos / Rendimiento
 - **Archivos afectados:**
@@ -115,7 +116,8 @@
 
 ---
 
-### [ ] Tarea 1.2: Resolver condiciones de carrera en inserciones concurrentes
+### [x] Tarea 1.2: Resolver condiciones de carrera en inserciones concurrentes
+> ✅ **Completado 2026-09-10.** `settings_repository.get_or_create` y `api/dictation.get_audio` ahora usan `INSERT ... ON CONFLICT DO NOTHING` + re-lectura en vez de `SELECT -> IF NOT FOUND -> INSERT`. (El tercer archivo listado, `vocabulary_service.py`, quedó resuelto de raíz por la Tarea 1.1 -- el patrón `_get_or_create` que causaba la condición de carrera ya no existe ahí.) Verificado con concurrencia real: 10 requests simultáneas a `/settings` para un usuario nuevo → 10x HTTP 200; 8 requests simultáneas a `/dictation/audio/{id}` para una oración nunca sintetizada → 8x HTTP 200 con audio idéntico, cero `IntegrityError`.
 - **Prioridad:** P1
 - **Área:** Backend & Base de Datos / Concurrencia
 - **Archivos afectados:**
@@ -131,7 +133,9 @@
 
 ---
 
-### [ ] Tarea 1.3: Persistir y acotar la duración real de práctica
+### [x] Tarea 1.3: Persistir y acotar la duración real de práctica
+> ✅ **Completado 2026-09-10.** `typing_sessions.duration_seconds` (nueva columna) guarda `min(payload.duration_seconds, wall_clock_elapsed)` -- el valor del cliente nunca puede superar lo que el servidor mismo observó transcurrir. `overview_for_user`/`history_for_user` ahora suman esta columna en vez de `finished_at - started_at`. De paso se corrigió el mismo patrón en `gamification_repository.practice_seconds_on` (objetivo diario), que sumaba wall-clock para las 3 tablas de sesión -- ahora usa `TypingSession.duration_seconds` y, para Recall/Dictation, la suma de `duration_seconds` por intento (ya existía y ya era honesta, solo no se estaba usando). Nota de transparencia: las sesiones históricas anteriores a esta migración quedan en `duration_seconds=0` (no se puede reconstruir retroactivamente un valor que nunca se guardó); el tiempo total practicado cae para reflejar solo datos honestos desde ahora en adelante -- es la compensación correcta de arreglar una sobreestimación sistemática. Verificado: sesión que reporta 3600s con <1s de wall-clock real → queda acotada a ~0.016s; sesión que reporta 1s con ~1.2s de wall-clock real → se guarda el 1s tal cual.
+- **Prioridad:** P1
 - **Prioridad:** P1
 - **Área:** Backend & Datos / Integridad de Métricas
 - **Archivos afectados:**
@@ -149,7 +153,9 @@
 
 ---
 
-### [ ] Tarea 1.4: Mover almacenamiento de audio WAV fuera de PostgreSQL
+### [x] Tarea 1.4: Mover almacenamiento de audio WAV fuera de PostgreSQL
+> ✅ **Completado 2026-09-10.** El WAV se escribe a un volumen Docker nombrado (`dictation_audio_cache`, montado en `/app/audio_cache` del backend) con nombre determinístico `{sentence_id}.wav`; `dictation_audio_cache` en Postgres perdió la columna `audio_data` y ahora es solo una fila-marcador (`id, sentence_id, created_at`) que sostiene el chequeo de cache-hit y la seguridad ante condiciones de carrera de la Tarea 1.2. Se agregó además resiliencia no pedida explícitamente pero necesaria para esta migración: si la fila existe en la DB pero el archivo falta en disco (ej. volumen limpiado por separado), el endpoint resintetiza en vez de devolver 500. Verificado: archivo real confirmado en el volumen (`ls` dentro del contenedor) con el tamaño exacto de la respuesta HTTP; `\d dictation_audio_cache` confirma que no queda ninguna columna binaria; 8 requests concurrentes a una oración nunca sintetizada devuelven audio idéntico; borrar el archivo manualmente y volver a pedirlo regenera correctamente en vez de fallar.
+- **Prioridad:** P1
 - **Prioridad:** P1
 - **Área:** DevOps & Base de Datos / Almacenamiento
 - **Archivos afectados:**

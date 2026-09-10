@@ -59,13 +59,24 @@ async def finish(
     wpm: float,
     accuracy: float,
     errors: list[dict],
+    duration_seconds: float,
 ) -> TypingSession:
-    session.finished_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    started_at = session.started_at
+    if started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+    server_elapsed = max((now - started_at).total_seconds(), 0.0)
+
+    session.finished_at = now
     session.correct_characters = correct
     session.incorrect_characters = incorrect
     session.total_characters = total
     session.wpm = wpm
     session.accuracy = accuracy
+    # Trust the client's measured active-typing time, but never beyond how much wall
+    # clock actually passed -- a stale/replayed client value can't inflate this past
+    # what the server itself observed.
+    session.duration_seconds = min(max(duration_seconds, 0.0), server_elapsed)
 
     for err in errors:
         db.add(TypingError(session_id=session.id, **err))
@@ -87,11 +98,9 @@ async def overview_for_user(db: AsyncSession, user_id: uuid.UUID) -> dict:
     total_sessions, avg_wpm, avg_accuracy, best_wpm, total_errors = result.one()
 
     duration_result = await db.execute(
-        select(
-            func.coalesce(
-                func.sum(func.extract("epoch", TypingSession.finished_at - TypingSession.started_at)), 0
-            )
-        ).where(TypingSession.user_id == user_id, TypingSession.finished_at.is_not(None))
+        select(func.coalesce(func.sum(TypingSession.duration_seconds), 0)).where(
+            TypingSession.user_id == user_id, TypingSession.finished_at.is_not(None)
+        )
     )
     total_seconds = duration_result.scalar_one()
 
@@ -156,9 +165,7 @@ async def history_for_user(db: AsyncSession, user_id: uuid.UUID, days: int | Non
             day.label("day"),
             func.coalesce(func.avg(TypingSession.wpm), 0),
             func.coalesce(func.avg(TypingSession.accuracy), 0),
-            func.coalesce(
-                func.sum(func.extract("epoch", TypingSession.finished_at - TypingSession.started_at)), 0
-            ),
+            func.coalesce(func.sum(TypingSession.duration_seconds), 0),
         )
         .where(*conditions)
         .group_by(day)

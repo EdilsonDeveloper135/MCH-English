@@ -36,6 +36,10 @@ class TypingSession(Base):
     total_characters: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     wpm: Mapped[float] = mapped_column(Float, nullable=False, default=0)
     accuracy: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    # Client-measured active typing time, capped server-side at min(client value,
+    # wall-clock elapsed) in session_repository.finish() -- NOT finished_at-started_at,
+    # which inflates practice time if the tab is left open idle in the background.
+    duration_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=0, server_default="0")
 
     user: Mapped["User"] = relationship(back_populates="typing_sessions")
     errors: Mapped[list["TypingError"]] = relationship(back_populates="session", cascade="all, delete-orphan")

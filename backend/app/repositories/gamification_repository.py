@@ -29,20 +29,41 @@ async def get_active_dates(db: AsyncSession, user_id: uuid.UUID) -> list[date]:
 
 
 async def practice_seconds_on(db: AsyncSession, user_id: uuid.UUID, day: date) -> float:
-    """Total finished-session duration across all 3 activity types for one UTC day --
-    NOT session_repository.history_for_user, which only looks at typing_sessions (a
-    user who practices only Dictation would never meet the daily goal if we used
-    that)."""
+    """Total ACTIVE (client-measured, not wall-clock) duration across all 3 activity
+    types for one UTC day -- NOT session_repository.history_for_user, which only
+    looks at typing_sessions (a user who practices only Dictation would never meet
+    the daily goal if we used that). Uses TypingSession.duration_seconds (already
+    server-capped in session_repository.finish) and RecallAttempt/DictationAttempt's
+    own per-round duration_seconds -- never finished_at-started_at, which inflates if
+    a tab is left open idle rather than actually being typed in."""
     start = datetime.combine(day, time.min, tzinfo=timezone.utc)
     end = start + timedelta(days=1)
-    total = 0.0
-    for model in _SESSION_MODELS:
-        result = await db.execute(
-            select(func.coalesce(func.sum(func.extract("epoch", model.finished_at - model.started_at)), 0)).where(
-                model.user_id == user_id, model.finished_at >= start, model.finished_at < end
-            )
+
+    typing_result = await db.execute(
+        select(func.coalesce(func.sum(TypingSession.duration_seconds), 0)).where(
+            TypingSession.user_id == user_id, TypingSession.finished_at >= start, TypingSession.finished_at < end
         )
-        total += float(result.scalar_one())
+    )
+    total = float(typing_result.scalar_one())
+
+    recall_result = await db.execute(
+        select(func.coalesce(func.sum(RecallAttempt.duration_seconds), 0))
+        .join(RecallSession, RecallAttempt.recall_session_id == RecallSession.id)
+        .where(RecallSession.user_id == user_id, RecallSession.finished_at >= start, RecallSession.finished_at < end)
+    )
+    total += float(recall_result.scalar_one())
+
+    dictation_result = await db.execute(
+        select(func.coalesce(func.sum(DictationAttempt.duration_seconds), 0))
+        .join(DictationSession, DictationAttempt.dictation_session_id == DictationSession.id)
+        .where(
+            DictationSession.user_id == user_id,
+            DictationSession.finished_at >= start,
+            DictationSession.finished_at < end,
+        )
+    )
+    total += float(dictation_result.scalar_one())
+
     return total
 
 

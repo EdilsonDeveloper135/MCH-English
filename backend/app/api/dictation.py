@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -47,13 +48,27 @@ async def get_audio(
     result = await db.execute(select(DictationAudio).where(DictationAudio.sentence_id == sentence_id))
     cached = result.scalar_one_or_none()
 
-    if cached is None:
-        audio_bytes = tts_service.synthesize(sentence.content)
-        cached = DictationAudio(sentence_id=sentence_id, audio_data=audio_bytes)
-        db.add(cached)
-        await db.commit()
-    else:
-        audio_bytes = cached.audio_data
+    if cached is not None:
+        audio_bytes = tts_service.read_cached_audio(sentence_id)
+        if audio_bytes is not None:
+            return Response(content=audio_bytes, media_type="audio/wav")
+        # Row exists but the file is gone (e.g. the volume was wiped independently of
+        # the DB) -- fall through and resynthesize/rewrite instead of 500ing.
+
+    audio_bytes = tts_service.synthesize(sentence.content)
+    tts_service.write_cached_audio(sentence_id, audio_bytes)
+    # Race-safe: two concurrent first-requests for the same sentence would both
+    # synthesize (wasteful but harmless, and deterministic -- eSpeak-NG produces
+    # identical bytes for the same input) and both write the file and try to insert
+    # the cache-marker row; ON CONFLICT DO NOTHING means the second insert is a
+    # no-op instead of raising IntegrityError on the unique sentence_id constraint.
+    stmt = (
+        pg_insert(DictationAudio)
+        .values(sentence_id=sentence_id)
+        .on_conflict_do_nothing(index_elements=[DictationAudio.sentence_id])
+    )
+    await db.execute(stmt)
+    await db.commit()
 
     return Response(content=audio_bytes, media_type="audio/wav")
 

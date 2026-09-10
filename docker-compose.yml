@@ -35,6 +35,8 @@ services:
     build:
       context: ./backend
     env_file: .env
+    volumes:
+      - dictation_audio_cache:/app/audio_cache
     depends_on:
       postgres:
         condition: service_healthy
@@ -83,3 +85,4 @@ services:
 
 volumes:
   postgres_data:
+  dictation_audio_cache:

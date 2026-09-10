@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, LargeBinary, String
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy import Text as SAText
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import UUID
@@ -11,9 +11,13 @@ from app.core.database import Base
 
 
 class DictationAudio(Base):
-    """Cached eSpeak-NG WAV output for a sentence, keyed one-per-sentence (speed is
+    """Marks that a sentence's eSpeak-NG WAV output has been synthesized and cached
+    to disk (see tts_service.py's _cache_path), one row per sentence (speed is
     handled client-side via the <audio> element's playbackRate, so no per-speed
-    variants are needed)."""
+    variants are needed). The bytes themselves live on a mounted volume, not in this
+    table -- a relational DB is the wrong place for binary blobs (backup/bloat cost
+    with no query benefit); this row exists only to make cache-hit checks and the
+    ON CONFLICT DO NOTHING race-safety in api/dictation.py possible."""
 
     __tablename__ = "dictation_audio_cache"
 
@@ -21,7 +25,6 @@ class DictationAudio(Base):
     sentence_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("sentences.id", ondelete="CASCADE"), unique=True, nullable=False
     )
-    audio_data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

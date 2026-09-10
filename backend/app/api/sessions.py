@@ -94,6 +94,7 @@ async def finish_session(
         wpm=wpm,
         accuracy=accuracy,
         errors=errors,
+        duration_seconds=payload.duration_seconds,
     )
 
     session_sentences = await session_repository.get_sentences_for_session(db, session)

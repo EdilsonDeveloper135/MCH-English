@@ -1,4 +1,8 @@
 import subprocess
+import uuid
+from pathlib import Path
+
+from app.core.config import settings
 
 VOICE = "en-us"
 WORDS_PER_MINUTE = 150
@@ -15,3 +19,24 @@ def synthesize(text: str) -> bytes:
         check=True,
     )
     return result.stdout
+
+
+def _cache_path(sentence_id: uuid.UUID) -> Path:
+    return Path(settings.audio_cache_dir) / f"{sentence_id}.wav"
+
+
+def read_cached_audio(sentence_id: uuid.UUID) -> bytes | None:
+    """Returns the cached WAV bytes for a sentence, or None if no file is cached
+    (including the case where a DictationAudio row exists but the file itself is
+    missing, e.g. the volume was wiped independently of the DB -- caller should
+    treat that the same as a cold cache miss and resynthesize)."""
+    path = _cache_path(sentence_id)
+    if not path.is_file():
+        return None
+    return path.read_bytes()
+
+
+def write_cached_audio(sentence_id: uuid.UUID, audio_bytes: bytes) -> None:
+    path = _cache_path(sentence_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(audio_bytes)
