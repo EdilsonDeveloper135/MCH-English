@@ -19,7 +19,7 @@ export default function VocabularyPage() {
       router.replace("/login");
       return;
     }
-    api.getVocabulary().then(setItems);
+    api.getVocabulary().then(setItems).catch(() => {});
   }, [hasHydrated, token, router]);
 
   function handlePracticeWeak() {

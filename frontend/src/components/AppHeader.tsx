@@ -54,7 +54,7 @@ export function AppHeader() {
             </Link>
           );
         })}
-        <button onClick={logout} className="hover:text-white">
+        <button onClick={() => logout()} className="hover:text-white">
           Salir
         </button>
       </nav>

@@ -57,7 +57,10 @@ export default function PracticePage() {
 
   useEffect(() => {
     if (!hasHydrated || !token) return;
-    api.getSettings().then((s) => setTranslationMode(s.translation_mode));
+    api
+      .getSettings()
+      .then((s) => setTranslationMode(s.translation_mode))
+      .catch(() => {});
   }, [hasHydrated, token]);
 
   const loadChunk = useCallback(async (currentText: TextDTO) => {

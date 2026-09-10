@@ -18,7 +18,10 @@ export default function GamificationPage() {
   const [goalDraft, setGoalDraft] = useState("");
   const [savingGoal, setSavingGoal] = useState(false);
 
-  const refresh = () => api.getGamificationOverview().then(setOverview);
+  // Swallowed: a failed fetch (e.g. an expired token, already handled by api.ts's
+  // 401 interceptor redirecting to /login) just leaves this page loading forever
+  // instead of surfacing as an unhandled promise rejection.
+  const refresh = () => api.getGamificationOverview().then(setOverview).catch(() => {});
 
   useEffect(() => {
     if (!hasHydrated) return;

@@ -27,6 +27,12 @@ import type {
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+// Dictionary entries never change at runtime, so a repeated lookup of the same word
+// (e.g. the same typo made twice in one session) is served from memory instead of
+// firing another request -- keyed lowercase, module-scoped so it survives across
+// components/pages for the lifetime of the tab.
+const dictionaryCache = new Map<string, string | null>();
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -59,6 +65,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+
+  // Only an *authenticated* request rejected with 401 means the token itself is
+  // expired/revoked -- /auth/login and /auth/register also return 401/409 for wrong
+  // credentials, but those requests never carry a token, so `token` being set here
+  // is what distinguishes "your session died" from "you typed the wrong password".
+  if (response.status === 401 && token) {
+    // Every page already redirects to /login once the store's token goes null
+    // (each page's hasHydrated/token effect), so clearing it here is enough to get
+    // the user off an indefinite loading screen instead of a full page reload.
+    const message = "Tu sesion expiro. Inicia sesion de nuevo.";
+    useAuthStore.getState().logout(message);
+    throw new ApiError(401, message);
+  }
 
   if (!response.ok) {
     let detail = response.statusText;
@@ -177,11 +196,20 @@ export const api = {
     }),
 
   lookupWord: async (word: string): Promise<string | null> => {
+    const key = word.toLowerCase();
+    if (dictionaryCache.has(key)) return dictionaryCache.get(key)!;
+
     try {
-      const result = await request<DictionaryLookupDTO>(`/dictionary/${encodeURIComponent(word.toLowerCase())}`);
+      const result = await request<DictionaryLookupDTO>(`/dictionary/${encodeURIComponent(key)}`);
+      dictionaryCache.set(key, result.translations);
       return result.translations;
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) return null;
+      if (err instanceof ApiError && err.status === 404) {
+        // A word genuinely missing from the dictionary stays missing -- caching the
+        // miss too means mistyping the same word again never re-fires the request.
+        dictionaryCache.set(key, null);
+        return null;
+      }
       throw err;
     }
   },

@@ -11,6 +11,7 @@ export default function LoginPage() {
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const setAuth = useAuthStore((s) => s.setAuth);
+  const sessionExpiredMessage = useAuthStore((s) => s.sessionExpiredMessage);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +40,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-6">
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
         <h1 className="text-2xl font-semibold text-white mb-6">Iniciar sesion</h1>
+        {sessionExpiredMessage && <p className="text-amber-400 text-sm -mt-2">{sessionExpiredMessage}</p>}
         <label htmlFor="login-email" className="sr-only">
           Email
         </label>

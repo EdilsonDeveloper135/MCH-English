@@ -45,13 +45,19 @@ export default function LibraryPage() {
       router.replace("/login");
       return;
     }
-    refresh().finally(() => setLoading(false));
+    // A failed fetch here (e.g. an expired token, already handled by api.ts's 401
+    // interceptor redirecting to /login) just leaves the list empty instead of
+    // needing its own error UI -- swallowed so it doesn't surface as an unhandled
+    // promise rejection.
+    refresh()
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [hasHydrated, token, router, refresh]);
 
   useEffect(() => {
     const hasPending = texts.some((t) => t.status === "pending" || t.status === "processing");
     if (!hasPending) return;
-    const timer = setInterval(() => refresh(), 2000);
+    const timer = setInterval(() => refresh().catch(() => {}), 2000);
     return () => clearInterval(timer);
   }, [texts, refresh]);
 

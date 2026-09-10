@@ -321,7 +321,8 @@
 
 ## FASE 4 — RENDIMIENTO (P2)
 
-### [ ] Tarea 4.1: Optimizar renderizado de caracteres en TypingText
+### [x] Tarea 4.1: Optimizar renderizado de caracteres en TypingText
+> ✅ **Completado 2026-09-10.** `TypingText.tsx` reescrito: el texto se parte en bloques (palabras y espacios, via `/\S+|\s+/g`) memoizados con `useMemo` sobre `targetText`, y cada bloque se renderiza con un componente `TypingWordBlock` envuelto en `React.memo` con un comparador custom (`areBlockPropsEqual`) que compara por *valor* -- no por referencia -- solo el rango `[start,end)` de `charStates` que le corresponde a ese bloque, más si el cursor entró o salió de él. Como `charStates` es un array nuevo en cada tecla (por diseño, ver `useTypingSession`), un `React.memo` con comparación por referencia por defecto no hubiera servido de nada; con el comparador por valor, cada pulsación solo fuerza el re-render + reconciliación DOM del bloque (palabra) donde ocurre el cambio real, en vez de las ~30 palabras completas del fragmento. Verificado: `docker compose build frontend` (type-check limpio) y una sesión de tipeo real disparando eventos `KeyboardEvent` directos sobre el input (para evitar el ruido conocido del tool de automatización con teclas individuales) -- confirmé letra por letra que el estado (correcto/incorrecto/pendiente) y la posición del cursor se renderizan exactamente igual que antes del refactor, incluyendo un error aislado en medio de una palabra ("c" incorrecta dentro de "cats" con "ats" siguiendo correcto). No pude medir fps real en este entorno (sin devtools de performance), así que el criterio de "60fps sin lag a >100 WPM" queda validado por diseño (menos nodos DOM tocados por tecla) y por la ausencia de regresiones funcionales, no por un profiling numerico.
 - **Prioridad:** P2
 - **Área:** Frontend / Rendimiento
 - **Archivos afectados:**
@@ -334,7 +335,8 @@
 
 ---
 
-### [ ] Tarea 4.2: Caché de consultas de diccionario en cliente
+### [x] Tarea 4.2: Caché de consultas de diccionario en cliente
+> ✅ **Completado 2026-09-10.** `api.ts` gana un `Map<string, string | null>` a nivel de módulo (`dictionaryCache`), consultado y poblado dentro de `api.lookupWord` antes de tocar la red -- cachea tanto los hits (traducción encontrada) como los misses (404, palabra no existe en el diccionario local), para que reescribir el mismo error de tipeo nunca dispare una segunda petición. Verificado en el navegador con eventos de teclado reales (no el `type`/`key` del tool, que en este entorno resultó poco confiable con teclas individuales -- lo documentado ya en la sesión): tipear un error sobre "cats" dispara `GET /dictionary/c`; deshacer con Backspace y volver a cometer el mismo error NO dispara una segunda petición (confirmado con `performance.getEntriesByType('resource')`, mismo array de un solo elemento antes y despues).
 - **Prioridad:** P2
 - **Área:** Frontend / Red
 - **Archivos afectados:**
@@ -347,7 +349,8 @@
 
 ---
 
-### [ ] Tarea 4.3: Interceptor de sesión expirada (401) en cliente
+### [x] Tarea 4.3: Interceptor de sesión expirada (401) en cliente
+> ✅ **Completado 2026-09-10.** `request()` en `api.ts` intercepta 401 -- pero solo cuando la petición llevaba un token (`token` ya leído al principio de la función), para no confundir un 401 de *credenciales invalidas* en `/auth/login` (que nunca lleva token) con un token realmente vencido; sin esa guarda, un intento de login con contrasena incorrecta hubiera mostrado "Tu sesion expiro" en vez del mensaje real del backend, verifique esto explicitamente como caso de regresion antes de darlo por bueno. Cuando sí es un token vencido/revocado, llama a `useAuthStore.getState().logout(mensaje)` -- reutilizando el mismo mecanismo reactivo de token->null que ya usa cada página para redirigir (el guard `if (hasHydrated && !token) router.replace('/login')` que ya existe en todas), sin recurrir a `window.location` (eso hubiera reintroducido el full-page-reload que la Fase 2 elimino a propósito). `authStore.ts` gana `sessionExpiredMessage` (excluido de `persist` via `partialize`, para que no sobreviva un reinicio del navegador ni reaparezca en un login no relacionado) y `login/page.tsx` lo muestra como banner informativo. Durante la verificación encontré y corregí un efecto secundario real: varias páginas (`library`, `progress`, `gamification`, `vocabulary`, `practice/[textId]`, `library/[textId]/align`) llamaban a `api.getX().then(setX)` sin `.catch`, así que el nuevo throw en 401 se filtraba como "Uncaught (in promise)" en la consola -- agregué `.catch(() => {})` a cada uno de esos call sites (el fallo ya no necesita manejo propio: el token pasa a null y el guard de cada página redirige solo). Verificado con `docker compose build frontend`, `pytest` (57 tests), y en el navegador: (1) login con contrasena incorrecta sigue mostrando "Invalid email or password" sin tocar el interceptor; (2) corromper el token en `localStorage` y navegar a una página protegida redirige de inmediato a `/login` mostrando "Tu sesion expiro. Inicia sesion de nuevo." sin reload completo; (3) repetí la prueba en una pestaña nueva (consola limpia) confirmando cero errores de promesa sin capturar.
 - **Prioridad:** P2
 - **Área:** Frontend / Autenticación
 - **Archivos afectados:**

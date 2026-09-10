@@ -64,7 +64,7 @@ export default function AlignmentReviewPage() {
         initial[s.index] = formatIndices(byEnglish.get(s.index) ?? []);
       });
       setInputs(initial);
-    });
+    }).catch(() => {});
   }, [hasHydrated, token, textId, router]);
 
   const spanishByIndex = useMemo(() => {

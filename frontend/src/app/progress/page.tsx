@@ -30,10 +30,13 @@ export default function ProgressPage() {
       router.replace("/login");
       return;
     }
-    api.getOverview().then(setStats);
-    api.getHistory().then(setHistory);
-    api.getVocabularyDistribution().then(setDistribution);
-    api.getWeakWords().then(setWeakWords);
+    // Swallowed: a failed fetch (e.g. an expired token, already handled by api.ts's
+    // 401 interceptor redirecting to /login) just leaves this card loading forever
+    // instead of surfacing as an unhandled promise rejection.
+    api.getOverview().then(setStats).catch(() => {});
+    api.getHistory().then(setHistory).catch(() => {});
+    api.getVocabularyDistribution().then(setDistribution).catch(() => {});
+    api.getWeakWords().then(setWeakWords).catch(() => {});
   }, [hasHydrated, token, router]);
 
   const loading = !stats || !history || !distribution || !weakWords;
