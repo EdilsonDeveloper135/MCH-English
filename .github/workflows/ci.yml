@@ -77,9 +77,12 @@ jobs:
       - name: Install eSpeak-NG
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends espeak-ng
 
+      # No --no-cache-dir here: that flag belongs in the image build (keeps layers
+      # small), but setup-python's `cache: pip` then finds an empty cache directory
+      # and fails the job in its post step. Here the cache is the point.
       - name: Install Python dependencies
         working-directory: backend
-        run: pip install --no-cache-dir -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Verify Alembic migrations apply cleanly
         working-directory: backend
