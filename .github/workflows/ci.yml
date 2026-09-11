@@ -71,6 +71,12 @@ jobs:
           cache: "pip"
           cache-dependency-path: backend/requirements.txt
 
+      # The TTS service shells out to eSpeak-NG, which the backend image installs but
+      # the runner does not ship: without it the dictation tests fail here while
+      # passing in every container.
+      - name: Install eSpeak-NG
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends espeak-ng
+
       - name: Install Python dependencies
         working-directory: backend
         run: pip install --no-cache-dir -r requirements.txt
