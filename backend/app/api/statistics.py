@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -18,7 +18,11 @@ async def overview(current_user: User = Depends(get_current_user), db: AsyncSess
 
 @router.get("/history", response_model=list[HistoryPoint])
 async def history(
-    days: int | None = None, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    # Bounded: an unchecked value went straight into timedelta(days=...) and raised
+    # OverflowError (a 500) for anything past ~999999999.
+    days: int | None = Query(default=None, ge=1, le=3650),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     points = await get_history(db, current_user.id, days=days)
     return [HistoryPoint(**p) for p in points]

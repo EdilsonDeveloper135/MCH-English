@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTypingStore } from "@/stores/typingStore";
+import type { ThemeMode } from "@/types/typing";
 
-export type Theme = "oled" | "nord" | "catppuccin" | "sepia";
+export type Theme = ThemeMode;
 
 export const THEMES: { id: Theme; label: string; bg: string }[] = [
   { id: "oled", label: "OLED", bg: "#000000" },
@@ -11,38 +13,38 @@ export const THEMES: { id: Theme; label: string; bg: string }[] = [
   { id: "sepia", label: "Sepia", bg: "#fbf1c7" },
 ];
 
+/** Single source of truth for the theme: the persisted preferences store. It used to
+ * live in its own `mch_theme` localStorage key, which meant the theme selector in
+ * Settings (writing to the store) changed nothing at all. */
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>("oled");
+  const theme = useTypingStore((s) => s.preferences.theme);
+  const setPreference = useTypingStore((s) => s.setPreference);
+
+  return {
+    theme,
+    setTheme: (next: Theme) => setPreference("theme", next),
+    themes: THEMES,
+  };
+}
+
+/** Applies the selected theme to the document. Mounted once, high in the tree. */
+export function useApplyTheme() {
+  const theme = useTypingStore((s) => s.preferences.theme);
 
   useEffect(() => {
-    const saved = (localStorage.getItem("mch_theme") as Theme) || "oled";
-    setThemeState(saved);
-    if (saved === "oled") {
+    if (theme === "oled") {
       document.documentElement.removeAttribute("data-theme");
     } else {
-      document.documentElement.setAttribute("data-theme", saved);
+      document.documentElement.setAttribute("data-theme", theme);
     }
-  }, []);
-
-  const setTheme = (next: Theme) => {
-    setThemeState(next);
-    localStorage.setItem("mch_theme", next);
-    if (next === "oled") {
-      document.documentElement.removeAttribute("data-theme");
-    } else {
-      document.documentElement.setAttribute("data-theme", next);
-    }
-  };
-
-  return { theme, setTheme, themes: THEMES };
+  }, [theme]);
 }
 
 export function useZenMode() {
   const [zenMode, setZenMode] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("mch_zen_mode") === "true";
-    setZenMode(saved);
+    setZenMode(localStorage.getItem("mch_zen_mode") === "true");
   }, []);
 
   const toggleZen = () => {
@@ -56,41 +58,18 @@ export function useZenMode() {
   return { zenMode, toggleZen };
 }
 
-export function ZenToggle({
-  zenMode,
-  onToggle,
-}: {
-  zenMode: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-label={zenMode ? "Desactivar modo Zen" : "Activar modo Zen"}
-      className={`px-2 py-1 text-xs rounded transition-colors focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none ${
-        zenMode
-          ? "bg-cyan-950 text-cyan-300 border border-cyan-700"
-          : "text-gray-400 hover:text-white border border-transparent"
-      }`}
-      title="Modo Zen: oculta métricas y distracciones durante el tipeo"
-    >
-      🧘 {zenMode ? "Zen On" : "Zen"}
-    </button>
-  );
-}
-
 export function ThemeSelector() {
   const { theme, setTheme, themes } = useTheme();
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1" role="group" aria-label="Tema de color">
       {themes.map((t) => (
         <button
           key={t.id}
           type="button"
           onClick={() => setTheme(t.id)}
           aria-label={`Tema ${t.label}`}
+          aria-pressed={theme === t.id}
           title={`Tema ${t.label}`}
           className={`w-4 h-4 rounded-full border transition-transform ${
             theme === t.id

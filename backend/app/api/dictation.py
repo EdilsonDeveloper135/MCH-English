@@ -2,13 +2,14 @@ import asyncio
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.models.dictation import DictationAttempt, DictationAudio, DictationSession
 from app.models.text import Sentence, Text, TextChunk
 from app.models.user import User
@@ -39,8 +40,16 @@ async def _get_owned_sentence(db: AsyncSession, sentence_id: uuid.UUID, user_id:
 
 
 @router.get("/audio/{sentence_id}")
+# Every cache miss spawns an eSpeak-NG process; without a ceiling a single client can
+# saturate the backend's CPU just by re-requesting audio.
+@limiter.limit("120/minute")
 async def get_audio(
-    sentence_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    request: Request,
+    # Requerido por slowapi para las cabeceras de rate limit.
+    response: Response,
+    sentence_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     sentence = await _get_owned_sentence(db, sentence_id, current_user.id)
     if sentence is None:
@@ -58,7 +67,10 @@ async def get_audio(
 
     # subprocess.run + disk I/O are blocking calls -- run them off the event loop so
     # one slow synthesis doesn't stall every other concurrent request being served.
-    audio_bytes = await asyncio.to_thread(tts_service.synthesize, sentence.content)
+    try:
+        audio_bytes = await asyncio.to_thread(tts_service.synthesize, sentence.content)
+    except tts_service.TTSUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     await asyncio.to_thread(tts_service.write_cached_audio, sentence_id, audio_bytes)
     # Race-safe: two concurrent first-requests for the same sentence would both
     # synthesize (wasteful but harmless, and deterministic -- eSpeak-NG produces
@@ -160,6 +172,8 @@ async def finish_dictation_session(
     session = result.scalar_one_or_none()
     if session is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dictation session not found")
+    if session.finished_at is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Esta sesion ya fue finalizada")
 
     session.finished_at = datetime.now(timezone.utc)
     await db.commit()

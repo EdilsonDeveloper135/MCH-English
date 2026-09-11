@@ -5,12 +5,12 @@
 MCH-English es una app de práctica de mecanografía en inglés diseñada para construir memoria muscular real: cada palabra que fallás queda registrada como vocabulario débil, cada sesión suma XP y racha, y todo el pipeline de idioma — traducción, alineación de oraciones, diccionario, voz — es determinístico y corre localmente. **Cero IA generativa, cero APIs externas de traducción o de voz, cero dependencias opacas.**
 
 [![Next.js](https://img.shields.io/badge/Next.js-14.2-black?logo=next.js)](https://nextjs.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.141-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![Backend tests](https://img.shields.io/badge/pytest-98%2F98-brightgreen?logo=pytest&logoColor=white)](./docs/ARCHITECTURE.md#testing)
-[![Frontend tests](https://img.shields.io/badge/vitest-46%2F46-brightgreen?logo=vitest&logoColor=white)](./docs/ARCHITECTURE.md#testing)
+[![Backend tests](https://img.shields.io/badge/pytest-104%2F104-brightgreen?logo=pytest&logoColor=white)](./docs/ARCHITECTURE.md#testing)
+[![Frontend tests](https://img.shields.io/badge/vitest-67%2F67-brightgreen?logo=vitest&logoColor=white)](./docs/ARCHITECTURE.md#testing)
 [![CI](https://github.com/EdilsonDeveloper135/MCH-English/actions/workflows/ci.yml/badge.svg)](https://github.com/EdilsonDeveloper135/MCH-English/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
@@ -26,8 +26,8 @@ Las apps de mecanografía (Monkeytype, Keybr, TypeRacer) son excelentes para vel
 - **Smooth Caret** — el cursor se interpola por CSS/hardware en vez de saltar carácter a carácter, igual que Monkeytype.
 - **Borrado atómico de palabra** (`Ctrl+Backspace` / `Cmd+Backspace`) — descartá una palabra entera fallada en un solo golpe, sin machacar Backspace letra por letra.
 - **Buffer de caracteres extra** — tipear de más al final de una palabra no rompe el estado del ejercicio; queda registrado como error sin desalinear el cursor.
-- **Feedback sonoro opcional** (Audio Cues) y **Modo Zen** con paletas antifatiga (Nord, Slate, Sepia).
-- Navegación 100% por teclado en Recall y Dictation (`Enter`/`Espacio` para avanzar, `Ctrl+Espacio` reproducir/pausar audio, `Ctrl+R` reiniciar).
+- **Feedback sonoro opcional** (4 perfiles, configurables en Ajustes) y **Modo Zen** con paletas antifatiga (Nord, Catppuccin, Sepia).
+- Navegación por teclado en Recall y Dictation (`Enter`/`Espacio` para avanzar, `Ctrl+Espacio` reproducir/pausar audio, `Alt+R` repetir), y paleta de comandos con `⌘K` / `Ctrl+K`.
 
 ### Modos de práctica
 - **Lectura guiada por chunks** — Smart Chunking divide cualquier texto en fragmentos de 30–150 palabras sin cortar oraciones a la mitad.
@@ -73,6 +73,8 @@ Detalle completo del flujo de datos (Smart Chunking → Gale-Church → FreeDict
 git clone https://github.com/EdilsonDeveloper135/MCH-English.git
 cd MCH-English
 cp .env.example .env
+# Clave de firma de los JWT: el backend no arranca sin una propia (mínimo 32 chars)
+printf 'SECRET_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
 docker compose up -d
 ```
 
@@ -99,16 +101,21 @@ La respuesta trae el `access_token` (JWT) para usar en el resto de los endpoints
 ## Comandos para desarrolladores
 
 Todo corre **dentro de los contenedores** — no hace falta Node ni Python instalados en el host.
+Los comandos de frontend necesitan el override de desarrollo (la imagen base es la de
+producción: `standalone`, sin devDependencies ni código fuente):
 
 ```bash
-# Tests de backend (98 tests)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# Tests de backend (104 tests)
 docker exec mch-english-backend-1 pytest -v
 
-# Tests de frontend (46 tests)
+# Tests de frontend (67 tests)
 docker exec mch-english-frontend-1 npm test
 
-# Linter de frontend
+# Linter y tipos de frontend
 docker exec mch-english-frontend-1 npm run lint
+docker exec mch-english-frontend-1 npx tsc --noEmit
 
 # Build de producción del frontend (verifica que las 14 rutas compilen)
 docker exec mch-english-frontend-1 npm run build

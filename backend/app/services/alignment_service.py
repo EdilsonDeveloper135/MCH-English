@@ -44,6 +44,22 @@ def _length_mismatch_cost(len_en: int, len_es: int, ratio: float) -> float:
     return -math.log(two_tailed_p)
 
 
+def _band_half_width(n: int, m: int) -> int:
+    """How far from the diagonal the search is allowed to wander.
+
+    A full (n+1)x(m+1) matrix is quadratic in both time and memory: measured at 15.9 s
+    and 132 MB for 1000x1000 sentences, which a single 100k-character text can exceed.
+    Since both sides are the *same* text in order, the optimal path never strays far
+    from the diagonal -- a band keeps the result identical for real translations while
+    making cost linear in the number of sentences. The floor of 50 keeps short texts
+    (and the unit tests) fully exact."""
+    return max(_MIN_BAND, min(_MAX_BAND, int(0.08 * max(n, m))))
+
+
+_MIN_BAND = 50
+_MAX_BAND = 400
+
+
 def align(english_sentences: list[str], spanish_sentences: list[str]) -> list[AlignmentBead]:
     """Aligns two ordered sentence lists (no reordering) into beads. Each bead lists the
     0-based indices, on each side, that belong together (usually one each; occasionally
@@ -62,58 +78,88 @@ def align(english_sentences: list[str], spanish_sentences: list[str]) -> list[Al
         ratio = 1.0
 
     inf = float("inf")
-    dp = [[inf] * (m + 1) for _ in range(n + 1)]
-    # choice[i][j] = (step_type, previous_i, previous_j) that produced dp[i][j]
-    choice: list[list[tuple[str, int, int] | None]] = [[None] * (m + 1) for _ in range(n + 1)]
-    dp[0][0] = 0.0
+    band = _band_half_width(n, m)
+
+    # Each row only materializes the columns inside the band, with `offset[i]` marking
+    # which real column its first slot stands for.
+    offset: list[int] = []
+    dp: list[list[float]] = []
+    choice: list[list[tuple[int, int] | None]] = []
+    for i in range(n + 1):
+        center = round(i * m / n) if n > 0 else m
+        lo = max(0, center - band)
+        hi = min(m, center + band)
+        offset.append(lo)
+        width = hi - lo + 1
+        dp.append([inf] * width)
+        choice.append([None] * width)
+
+    def get(i: int, j: int) -> float:
+        k = j - offset[i]
+        if 0 <= k < len(dp[i]):
+            return dp[i][k]
+        return inf
+
+    def relax(i: int, j: int, cost: float, prev_i: int, prev_j: int) -> None:
+        k = j - offset[i]
+        if not (0 <= k < len(dp[i])):
+            return  # outside the band: this path is not considered
+        if cost < dp[i][k]:
+            dp[i][k] = cost
+            choice[i][k] = (prev_i, prev_j)
+
+    relax(0, 0, 0.0, -1, -1)
 
     for i in range(n + 1):
-        for j in range(m + 1):
-            base = dp[i][j]
+        lo = offset[i]
+        for k, base in enumerate(dp[i]):
             if base == inf:
                 continue
+            j = lo + k
 
             if i + 1 <= n:
-                cost = base + _STEP_COST["1-0"]
-                if cost < dp[i + 1][j]:
-                    dp[i + 1][j] = cost
-                    choice[i + 1][j] = ("1-0", i, j)
+                relax(i + 1, j, base + _STEP_COST["1-0"], i, j)
 
             if j + 1 <= m:
-                cost = base + _STEP_COST["0-1"]
-                if cost < dp[i][j + 1]:
-                    dp[i][j + 1] = cost
-                    choice[i][j + 1] = ("0-1", i, j)
+                relax(i, j + 1, base + _STEP_COST["0-1"], i, j)
 
             if i + 1 <= n and j + 1 <= m:
-                cost = base + _STEP_COST["1-1"] + _length_mismatch_cost(en_len[i], es_len[j], ratio)
-                if cost < dp[i + 1][j + 1]:
-                    dp[i + 1][j + 1] = cost
-                    choice[i + 1][j + 1] = ("1-1", i, j)
+                relax(
+                    i + 1,
+                    j + 1,
+                    base + _STEP_COST["1-1"] + _length_mismatch_cost(en_len[i], es_len[j], ratio),
+                    i,
+                    j,
+                )
 
             if i + 2 <= n and j + 1 <= m:
-                cost = base + _STEP_COST["2-1"] + _length_mismatch_cost(
-                    en_len[i] + en_len[i + 1], es_len[j], ratio
+                relax(
+                    i + 2,
+                    j + 1,
+                    base + _STEP_COST["2-1"] + _length_mismatch_cost(en_len[i] + en_len[i + 1], es_len[j], ratio),
+                    i,
+                    j,
                 )
-                if cost < dp[i + 2][j + 1]:
-                    dp[i + 2][j + 1] = cost
-                    choice[i + 2][j + 1] = ("2-1", i, j)
 
             if i + 1 <= n and j + 2 <= m:
-                cost = base + _STEP_COST["1-2"] + _length_mismatch_cost(
-                    en_len[i], es_len[j] + es_len[j + 1], ratio
+                relax(
+                    i + 1,
+                    j + 2,
+                    base + _STEP_COST["1-2"] + _length_mismatch_cost(en_len[i], es_len[j] + es_len[j + 1], ratio),
+                    i,
+                    j,
                 )
-                if cost < dp[i + 1][j + 2]:
-                    dp[i + 1][j + 2] = cost
-                    choice[i + 1][j + 2] = ("1-2", i, j)
 
     beads: list[AlignmentBead] = []
     i, j = n, m
     while i > 0 or j > 0:
-        step = choice[i][j]
+        k = j - offset[i]
+        step = choice[i][k] if 0 <= k < len(choice[i]) else None
         if step is None:
             break  # unreachable for well-formed input; guards pathological cases
-        _step_type, prev_i, prev_j = step
+        prev_i, prev_j = step
+        if prev_i < 0:
+            break
         beads.append(
             AlignmentBead(
                 english_indices=list(range(prev_i, i)),

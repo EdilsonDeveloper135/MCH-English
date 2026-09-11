@@ -139,6 +139,8 @@ async def finish_recall_session(
     session = result.scalar_one_or_none()
     if session is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recall session not found")
+    if session.finished_at is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Esta sesion ya fue finalizada")
 
     session.finished_at = datetime.now(timezone.utc)
     await db.commit()

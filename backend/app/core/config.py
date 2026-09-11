@@ -4,6 +4,19 @@ from typing import Any
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Values shipped in .env.example / tutorials. Booting with one of these means the JWT
+# signing key is public knowledge, so the app refuses to start instead of pretending
+# to be secure.
+_PLACEHOLDER_SECRETS = {
+    "changeme",
+    "change-me",
+    "changeme-generate-a-real-secret",
+    "secret",
+    "supersecret",
+    "your-secret-key",
+}
+MIN_SECRET_KEY_LENGTH = 32
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
@@ -18,6 +31,17 @@ class Settings(BaseSettings):
     # Dictation WAV cache lives on a mounted volume, not in Postgres (see
     # tts_service.py) -- avoids bloating the relational DB with binary blobs.
     audio_cache_dir: str = "/app/audio_cache"
+
+    @field_validator("secret_key")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        candidate = v.strip()
+        if candidate.lower() in _PLACEHOLDER_SECRETS or len(candidate) < MIN_SECRET_KEY_LENGTH:
+            raise ValueError(
+                "SECRET_KEY inseguro: define una clave propia de al menos "
+                f"{MIN_SECRET_KEY_LENGTH} caracteres. Generala con: openssl rand -hex 32"
+            )
+        return candidate
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -36,4 +60,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-

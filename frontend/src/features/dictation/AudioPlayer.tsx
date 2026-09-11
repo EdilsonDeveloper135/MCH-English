@@ -15,28 +15,40 @@ export function AudioPlayer({ sentenceId }: AudioPlayerProps) {
   const [speed, setSpeed] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     let objectUrl: string | null = null;
     let cancelled = false;
     setLoading(true);
+    setError(null);
     setUrl(null);
 
-    api.getDictationAudioUrl(sentenceId).then((u) => {
-      if (cancelled) {
-        URL.revokeObjectURL(u);
-        return;
-      }
-      objectUrl = u;
-      setUrl(u);
-      setLoading(false);
-    });
+    api
+      .getDictationAudioUrl(sentenceId)
+      .then((u) => {
+        if (cancelled) {
+          URL.revokeObjectURL(u);
+          return;
+        }
+        objectUrl = u;
+        setUrl(u);
+        setLoading(false);
+      })
+      .catch(() => {
+        // Without this the button stayed on "Cargando..." forever whenever synthesis
+        // failed, with no way to retry.
+        if (cancelled) return;
+        setLoading(false);
+        setError("No se pudo cargar el audio de esta oracion.");
+      });
 
     return () => {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [sentenceId]);
+  }, [sentenceId, reloadToken]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = speed;
@@ -106,6 +118,18 @@ export function AudioPlayer({ sentenceId }: AudioPlayerProps) {
           Alt+R ↺
         </kbd>
       </button>
+      {error && (
+        <span className="flex items-center gap-2 text-xs text-red-300">
+          {error}
+          <button
+            type="button"
+            onClick={() => setReloadToken((n) => n + 1)}
+            className="underline hover:text-red-200 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none rounded"
+          >
+            Reintentar
+          </button>
+        </span>
+      )}
       <label htmlFor="playback-speed" className="sr-only">
         Velocidad de reproducción
       </label>

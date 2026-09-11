@@ -101,3 +101,63 @@ async def test_a_user_cannot_finish_another_users_session(
         headers=other_headers,
     )
     assert response.status_code == 404
+
+
+async def test_finishing_a_session_twice_is_rejected(
+    client: AsyncClient, auth_headers: dict[str, str], process_text_now
+):
+    """A replayed PATCH used to insert the error rows again and count every word of the
+    chunk as another encounter, quietly inflating the vocabulary mastery scores."""
+    ids = await _create_ready_text_with_chunk(client, auth_headers, process_text_now)
+    session = (await client.post("/sessions", json=ids, headers=auth_headers)).json()
+    payload = {
+        "correct_characters": 20,
+        "incorrect_characters": 1,
+        "total_characters": 21,
+        "duration_seconds": 10,
+        "errors": [{"expected_char": "a", "typed_char": "s", "position": 1, "word": "cats"}],
+    }
+
+    first = await client.patch(f"/sessions/{session['id']}", json=payload, headers=auth_headers)
+    assert first.status_code == 200
+
+    second = await client.patch(f"/sessions/{session['id']}", json=payload, headers=auth_headers)
+    assert second.status_code == 409
+
+    vocabulary = (await client.get("/vocabulary", headers=auth_headers)).json()
+    cats = next(item for item in vocabulary if item["word"] == "cats")
+    assert cats["encounters"] == 1
+    assert cats["typing_errors"] == 1
+
+
+async def test_finish_session_clips_oversized_error_fields_instead_of_failing(
+    client: AsyncClient, auth_headers: dict[str, str], process_text_now
+):
+    """`typing_errors.word` is VARCHAR(255) and the char columns are VARCHAR(8): an
+    over-long token in the source text used to make the whole save fail with a 500."""
+    ids = await _create_ready_text_with_chunk(client, auth_headers, process_text_now)
+    session = (await client.post("/sessions", json=ids, headers=auth_headers)).json()
+
+    response = await client.patch(
+        f"/sessions/{session['id']}",
+        json={
+            "correct_characters": 1,
+            "incorrect_characters": 1,
+            "total_characters": 2,
+            "duration_seconds": 5,
+            "errors": [
+                {"expected_char": "x" * 40, "typed_char": "y" * 40, "position": 0, "word": "w" * 900}
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
+
+async def test_history_rejects_an_out_of_range_day_window(client: AsyncClient, auth_headers: dict[str, str]):
+    """An unbounded `days` went straight into timedelta(days=...) and raised OverflowError."""
+    response = await client.get("/statistics/history?days=1000000000", headers=auth_headers)
+    assert response.status_code == 422
+
+    ok = await client.get("/statistics/history?days=30", headers=auth_headers)
+    assert ok.status_code == 200

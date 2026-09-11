@@ -7,8 +7,8 @@ describe("buildBlankTargetText", () => {
   it("extracts and concatenates blanked words with a single space", () => {
     const content = "The quick brown fox jumps";
     const blanks: BlankDTO[] = [
-      { start: 4, end: 9, word: "quick" },
-      { start: 16, end: 19, word: "fox" },
+      { start: 4, end: 9 },
+      { start: 16, end: 19 },
     ];
 
     expect(buildBlankTargetText(content, blanks)).toBe("quick fox");
@@ -17,7 +17,7 @@ describe("buildBlankTargetText", () => {
 
 describe("MissingWordsText", () => {
   const content = "The quick fox";
-  const blanks: BlankDTO[] = [{ start: 4, end: 9, word: "quick" }];
+  const blanks: BlankDTO[] = [{ start: 4, end: 9 }];
 
   it("renders non-blank text correctly alongside distinct blank cells", () => {
     const { container } = render(

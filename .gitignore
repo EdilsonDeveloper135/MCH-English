@@ -19,6 +19,7 @@ venv/
 
 # Docker volumes / data
 postgres_data/
+backend/audio_cache/
 
 # OS / editor
 .DS_Store

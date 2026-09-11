@@ -1,9 +1,11 @@
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 WORKDIR /app
-COPY package.json ./
+# The lockfile travels with package.json so every build installs exactly what CI
+# tested; `npm install` from package.json alone re-resolved the ^ ranges each time.
+COPY package.json package-lock.json ./
 
 FROM base AS dev
-RUN npm install
+RUN npm ci
 COPY . .
 RUN chown -R node:node /app
 USER node
@@ -11,7 +13,7 @@ EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
 FROM base AS deps
-RUN npm install
+RUN npm ci
 
 FROM deps AS build
 ARG NEXT_PUBLIC_API_URL
@@ -19,7 +21,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build --chown=node:node /app/public ./public

@@ -9,7 +9,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import type { ErrorInput } from "@/types";
-import { audioCuePlayer } from "./audioCues";
+import { soundEngine } from "./audio/SoundEngine";
 
 export type CharStatus = "pending" | "correct" | "incorrect";
 
@@ -110,6 +110,9 @@ interface UseTypingSessionArgs {
   targetText: string;
   sentenceRanges: SentenceRange[];
   initialIndex?: number;
+  /** Changing this restarts the exercise even when `targetText` is identical -- what
+   * "retry this same chunk" needs, since the reset is otherwise keyed on the text. */
+  resetKey?: string | number;
   onSentenceComplete?: (sentenceId: string, endIndex: number) => void;
   onComplete?: (stats: ChunkCompleteStats) => void;
   onWordError?: (word: string, position: number) => void;
@@ -119,6 +122,7 @@ export function useTypingSession({
   targetText,
   sentenceRanges,
   initialIndex = 0,
+  resetKey,
   onSentenceComplete,
   onComplete,
   onWordError,
@@ -177,7 +181,7 @@ export function useTypingSession({
     setErrors([]);
     setStartedAt(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetText]);
+  }, [targetText, resetKey]);
 
   useEffect(() => {
     if (!startedAt || isComplete) return;
@@ -342,7 +346,7 @@ export function useTypingSession({
           sentence_id: sentenceIdAt(idx),
         });
         if (word) onWordError?.(word, errorPos);
-        audioCuePlayer.playError();
+        soundEngine.play("error");
         return;
       }
 
@@ -356,12 +360,12 @@ export function useTypingSession({
       if (isCorrect) {
         finalCorrectCount += 1;
         correctCountRef.current = finalCorrectCount;
-        audioCuePlayer.playClick();
+        soundEngine.play("keystroke");
       } else {
         finalIncorrectCount += 1;
         correctCountRef.current = finalCorrectCount;
         incorrectCountRef.current = finalIncorrectCount;
-        audioCuePlayer.playError();
+        soundEngine.play("error");
 
         const word = wordAtPosition(targetText, idx);
         errorsRef.current.push({
@@ -417,6 +421,11 @@ export function useTypingSession({
         }
         return;
       }
+
+      // A shortcut is not a character: without this, Cmd/Ctrl+A, +V or +K typed the
+      // letter into the exercise (and counted it as an error) while also triggering
+      // the browser's or the app's own action.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       if (e.key.length !== 1) return;
       e.preventDefault();

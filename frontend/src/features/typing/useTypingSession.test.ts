@@ -258,3 +258,41 @@ describe("useTypingSession", () => {
     expect(result.current.charStates[0]).toBe("pending");
   });
 });
+
+describe("useTypingSession keyboard shortcuts", () => {
+  it("ignores Ctrl/Cmd/Alt combinations instead of typing the letter", () => {
+    const { result } = renderHook(() => useTypingSession({ targetText: "abc", sentenceRanges: [] }));
+
+    act(() =>
+      result.current.handleKeyDown({
+        key: "a",
+        metaKey: true,
+        preventDefault: vi.fn(),
+      } as unknown as KeyboardEvent<HTMLInputElement>)
+    );
+    act(() =>
+      result.current.handleKeyDown({
+        key: "v",
+        ctrlKey: true,
+        preventDefault: vi.fn(),
+      } as unknown as KeyboardEvent<HTMLInputElement>)
+    );
+
+    expect(result.current.currentIndex).toBe(0);
+    expect(result.current.charStates).toEqual(["pending", "pending", "pending"]);
+  });
+
+  it("restarts the exercise when resetKey changes, even with the same text", () => {
+    const { result, rerender } = renderHook(
+      ({ resetKey }) => useTypingSession({ targetText: "abc", sentenceRanges: [], resetKey }),
+      { initialProps: { resetKey: 1 } }
+    );
+
+    act(() => result.current.handleKeyDown(keyEvent("a")));
+    expect(result.current.currentIndex).toBe(1);
+
+    rerender({ resetKey: 2 });
+    expect(result.current.currentIndex).toBe(0);
+    expect(result.current.charStates).toEqual(["pending", "pending", "pending"]);
+  });
+});

@@ -107,6 +107,15 @@ async def set_status(db: AsyncSession, text_id: uuid.UUID, status: str, error_me
     await db.commit()
 
 
+async def get_sentence_ids(db: AsyncSession, text_id: uuid.UUID) -> list[uuid.UUID]:
+    """Ids only -- used to clean up the on-disk dictation audio of a text about to be
+    deleted, where the sentence bodies are not needed."""
+    result = await db.execute(
+        select(Sentence.id).join(TextChunk, Sentence.chunk_id == TextChunk.id).where(TextChunk.text_id == text_id)
+    )
+    return list(result.scalars().all())
+
+
 async def get_ordered_sentences(db: AsyncSession, text_id: uuid.UUID) -> list[Sentence]:
     result = await db.execute(
         select(Sentence)

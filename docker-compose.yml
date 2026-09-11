@@ -15,6 +15,11 @@ services:
 
   redis:
     image: redis:7-alpine
+    # Persisted: the token revocation list lives here, so a restart used to make every
+    # logged-out token valid again until its natural expiry.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -89,4 +94,5 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
   dictation_audio_cache:

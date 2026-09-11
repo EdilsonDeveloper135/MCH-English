@@ -1,8 +1,8 @@
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import bearer_scheme, get_current_user
+from app.api.deps import get_bearer_token, get_current_user
 from app.core.database import get_db
 from app.core.limiter import limiter
 from app.core.security import create_access_token, hash_password, revoke_token, verify_password
@@ -11,6 +11,7 @@ from app.repositories import user_repository
 from app.schemas.auth import Token, UserLogin, UserOut, UserRegister
 
 router = APIRouter()
+logger = structlog.get_logger(__name__)
 
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
@@ -35,12 +36,27 @@ async def login(request: Request, response: Response, payload: UserLogin, db: As
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
-async def logout(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
-    revoke_token(credentials.credentials)
+@limiter.limit("30/minute")
+async def logout(
+    request: Request,
+    response: Response,
+    token: str = Depends(get_bearer_token),
+    # Depending on get_current_user makes the token's validity a precondition: without
+    # it, any unauthenticated caller could write arbitrary keys into the Redis
+    # blacklist (which also backs the job queue and the rate limiter).
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        await revoke_token(token)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("token_revocation_failed", error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se pudo cerrar la sesion ahora mismo; intenta de nuevo.",
+        ) from exc
     return {"message": "Successfully logged out"}
 
 
 @router.get("/me", response_model=UserOut)
 async def me(current_user: User = Depends(get_current_user)):
     return UserOut(id=str(current_user.id), email=current_user.email)
-
