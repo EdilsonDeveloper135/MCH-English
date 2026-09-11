@@ -1,7 +1,8 @@
+import re
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import Numeric, and_, case, cast, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,62 +29,67 @@ async def record_session_words(
     db: AsyncSession, user_id: uuid.UUID, sentences: list[Sentence], error_words: set[str]
 ) -> None:
     """Registers every distinct word in `sentences` as one more encounter (and, for
-    words in `error_words`, one more typing error). Previously did one SELECT + one
-    INSERT/UPDATE per word in a Python loop (up to ~160 queries for a long chunk) --
-    now does exactly one SELECT (to read prior encounters/typing_errors for words
-    already tracked) plus one bulk INSERT ... ON CONFLICT DO UPDATE, regardless of how
-    many words are involved."""
+    words in `error_words`, one more typing error), in a single statement.
+
+    The inserted values are *deltas*, and the conflict branch adds them to whatever is
+    already stored, computing the new mastery entirely in SQL. Reading the current
+    counters into Python first (as this used to) made two sessions finishing at the
+    same time overwrite each other, silently losing encounters and errors."""
     words: set[str] = set()
     for sentence in sentences:
         words.update(w.lower() for w in extract_words(sentence.content))
     if not words:
         return
 
-    result = await db.execute(
-        select(
-            VocabularyItem.word, VocabularyItem.encounters, VocabularyItem.typing_errors, VocabularyItem.last_error_at
-        ).where(VocabularyItem.user_id == user_id, VocabularyItem.word.in_(words))
-    )
-    existing = {row.word: row for row in result.all()}
-
     now = datetime.now(timezone.utc)
     rows = []
     for word in words:
-        prior = existing.get(word)
         is_error = word in error_words
-        encounters = (prior.encounters if prior else 0) + 1
-        typing_errors = (prior.typing_errors if prior else 0) + (1 if is_error else 0)
         rows.append(
             {
                 "id": uuid.uuid4(),
                 "user_id": user_id,
                 "word": word,
-                "encounters": encounters,
-                "typing_errors": typing_errors,
-                "mastery_score": mastery_score(encounters, typing_errors),
+                "encounters": 1,
+                "typing_errors": 1 if is_error else 0,
+                "mastery_score": mastery_score(1, 1 if is_error else 0),
                 "last_seen": now,
-                "last_error_at": now if is_error else (prior.last_error_at if prior else None),
+                "last_error_at": now if is_error else None,
             }
         )
 
     stmt = pg_insert(VocabularyItem).values(rows)
+    new_encounters = VocabularyItem.encounters + stmt.excluded.encounters
+    new_errors = VocabularyItem.typing_errors + stmt.excluded.typing_errors
     stmt = stmt.on_conflict_do_update(
         index_elements=[VocabularyItem.user_id, VocabularyItem.word],
         set_={
-            "encounters": stmt.excluded.encounters,
-            "typing_errors": stmt.excluded.typing_errors,
-            "mastery_score": stmt.excluded.mastery_score,
+            "encounters": new_encounters,
+            "typing_errors": new_errors,
+            # Same formula as mastery_score(), evaluated by Postgres against the row
+            # as it exists at write time.
+            "mastery_score": func.round(
+                cast(100.0 * (new_encounters - new_errors) / func.nullif(new_encounters, 0), Numeric),
+                1,
+            ),
             "last_seen": stmt.excluded.last_seen,
-            "last_error_at": stmt.excluded.last_error_at,
+            "last_error_at": func.coalesce(stmt.excluded.last_error_at, VocabularyItem.last_error_at),
         },
     )
     await db.execute(stmt)
     await db.commit()
 
 
-async def get_vocabulary(db: AsyncSession, user_id: uuid.UUID) -> list[VocabularyItem]:
+async def get_vocabulary(
+    db: AsyncSession, user_id: uuid.UUID, limit: int = 500, offset: int = 0
+) -> list[VocabularyItem]:
     result = await db.execute(
-        select(VocabularyItem).where(VocabularyItem.user_id == user_id).order_by(VocabularyItem.mastery_score.asc())
+        select(VocabularyItem)
+        .where(VocabularyItem.user_id == user_id)
+        # `word` breaks ties so paging is stable when many words share a score.
+        .order_by(VocabularyItem.mastery_score.asc(), VocabularyItem.word.asc())
+        .limit(limit)
+        .offset(offset)
     )
     return list(result.scalars().all())
 
@@ -106,37 +112,43 @@ async def build_weak_words_sentences(
     max_per_word: int = 2,
 ) -> list[Sentence]:
     """Picks real sentences from the user's own library that contain the given words --
-    no synthetic/generated content, per the product's no-AI stance. Filters with one
-    query per word directly in Postgres (word-boundary regex, `\\y` is the Postgres
-    ARE equivalent of PCRE's `\\b`) instead of loading the user's entire library into
-    Python and scanning it there -- words only ever come from extract_words'
-    [A-Za-z0-9']+ token set, which contains no regex metacharacters in either dialect,
-    so no escaping is needed."""
+    no synthetic/generated content, per the product's no-AI stance.
+
+    Filtering happens in Postgres with a single word-boundary regex covering every word
+    at once (`\\y` is the ARE equivalent of PCRE's `\\b`); the per-word quota is then
+    applied in Python over that small result set. Previously this ran one full regex
+    scan per word. Every word is escaped before being interpolated, even though they
+    only ever come from `extract_words`' token set."""
     if not words:
         return []
 
+    alternation = "|".join(re.escape(word) for word in words)
+    result = await db.execute(
+        select(Sentence)
+        .join(TextChunk, Sentence.chunk_id == TextChunk.id)
+        .join(Text, TextChunk.text_id == Text.id)
+        .where(Text.user_id == user_id, Sentence.content.op("~*")(rf"\y({alternation})\y"))
+        .order_by(Sentence.index)
+        .limit(max_sentences * max_per_word)
+    )
+    candidates = list(result.scalars().all())
+
     selected: list[Sentence] = []
     selected_ids: set[uuid.UUID] = set()
+    per_word: dict[str, int] = {}
 
     for word in words:
-        remaining = max_sentences - len(selected)
-        if remaining <= 0:
-            break
-
-        query = (
-            select(Sentence)
-            .join(TextChunk, Sentence.chunk_id == TextChunk.id)
-            .join(Text, TextChunk.text_id == Text.id)
-            .where(Text.user_id == user_id, Sentence.content.op("~*")(rf"\y{word}\y"))
-        )
-        if selected_ids:
-            query = query.where(Sentence.id.not_in(selected_ids))
-        query = query.limit(min(max_per_word, remaining))
-
-        result = await db.execute(query)
-        for sentence in result.scalars().all():
+        pattern = re.compile(rf"\b{re.escape(word)}\b", re.IGNORECASE)
+        for sentence in candidates:
+            if len(selected) >= max_sentences:
+                return selected
+            if per_word.get(word, 0) >= max_per_word:
+                break
+            if sentence.id in selected_ids or not pattern.search(sentence.content):
+                continue
             selected.append(sentence)
             selected_ids.add(sentence.id)
+            per_word[word] = per_word.get(word, 0) + 1
 
     return selected
 

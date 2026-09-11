@@ -39,6 +39,7 @@ export type TranslationMode = "learning" | "immersion" | "assisted";
 export interface UserSettingsDTO {
   translation_mode: TranslationMode;
   daily_goal_minutes: number;
+  timezone: string;
 }
 
 export interface AlignmentSentenceDTO {

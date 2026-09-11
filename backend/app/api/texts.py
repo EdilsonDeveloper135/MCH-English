@@ -1,10 +1,12 @@
+import asyncio
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.models.text import Sentence, SentencePhrase, Text
 from app.models.user import User
 from app.repositories import text_repository
@@ -23,7 +25,7 @@ from app.schemas.texts import (
     TextOut,
     TranslationUpdate,
 )
-from app.services import vocabulary_service
+from app.services import tts_service, vocabulary_service
 from app.services.text_service import create_text
 from app.services.translation_service import realign_translation
 
@@ -97,7 +99,11 @@ async def _build_alignment_out(db: AsyncSession, text: Text) -> AlignmentOut:
 
 
 @router.post("", response_model=TextOut, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/hour")
 async def create(
+    request: Request,
+    # `response` lo exige slowapi para inyectar las cabeceras X-RateLimit-*.
+    response: Response,
     payload: TextCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -136,7 +142,13 @@ async def delete_text(
     text = await text_repository.get_by_id(db, text_id, current_user.id)
     if text is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Text not found")
+
+    # The cache-marker rows cascade with the sentences, but the WAV files live on a
+    # mounted volume and would otherwise stay there forever.
+    sentence_ids = await text_repository.get_sentence_ids(db, text_id)
     await text_repository.delete(db, text)
+    if sentence_ids:
+        await asyncio.to_thread(tts_service.delete_cached_audio, sentence_ids)
 
 
 @router.get("/{text_id}/chunks/{index}", response_model=ChunkOut)
@@ -235,14 +247,21 @@ async def update_progress(
     if text is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Text not found")
 
-    text = await text_repository.update_progress(
-        db, text, payload.current_chunk_index, payload.current_character_index
-    )
+    # Clamped instead of trusted: an out-of-range index produced progress above 100%
+    # and made the "text completed" achievement unlockable without practicing.
+    # chunk_count itself is a valid value -- it is what "finished the whole text" means.
+    chunk_index = min(max(payload.current_chunk_index, 0), len(text.chunks))
+    character_index = max(payload.current_character_index, 0)
+
+    text = await text_repository.update_progress(db, text, chunk_index, character_index)
     return _to_text_out(text)
 
 
 @router.patch("/{text_id}/translation", response_model=TextOut)
+@limiter.limit("60/hour")
 async def update_translation(
+    request: Request,
+    response: Response,
     text_id: uuid.UUID,
     payload: TranslationUpdate,
     current_user: User = Depends(get_current_user),

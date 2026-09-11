@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import Date, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,35 +11,41 @@ from app.models.gamification import UserAchievement
 from app.models.recall import RecallAttempt, RecallSession
 from app.models.typing_session import TypingSession
 
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 _SESSION_MODELS = (TypingSession, RecallSession, DictationSession)
 
 
-async def _active_dates(db: AsyncSession, model, user_id: uuid.UUID) -> set[date]:
-    day = func.date_trunc("day", model.finished_at)
+async def _active_dates(db: AsyncSession, model, user_id: uuid.UUID, tz_str: str = "UTC") -> set[date]:
+    # Convert UTC timestamptz to user's timezone before grouping by calendar day,
+    # so an evening session (e.g. 21:00 in UTC-5) counts toward today instead of tomorrow.
+    day = func.cast(func.timezone(tz_str, model.finished_at), Date)
     result = await db.execute(select(day).distinct().where(model.user_id == user_id, model.finished_at.is_not(None)))
-    return {row.date() for row in result.scalars().all()}
+    return {row if isinstance(row, date) else row.date() for row in result.scalars().all()}
 
 
-async def get_active_dates(db: AsyncSession, user_id: uuid.UUID) -> list[date]:
-    """Distinct UTC calendar dates with a finished session across Practice, Recall,
-    and Dictation -- summed in Python across 3 queries, matching the existing
-    multi-query aggregation style (see statistics_service.get_overview)."""
+async def get_active_dates(db: AsyncSession, user_id: uuid.UUID, tz_str: str = "UTC") -> list[date]:
+    """Distinct calendar dates (in the user's timezone) with a finished session across
+    Practice, Recall, and Dictation."""
     dates: set[date] = set()
     for model in _SESSION_MODELS:
-        dates |= await _active_dates(db, model, user_id)
+        dates |= await _active_dates(db, model, user_id, tz_str=tz_str)
     return sorted(dates)
 
 
-async def practice_seconds_on(db: AsyncSession, user_id: uuid.UUID, day: date) -> float:
+async def practice_seconds_on(db: AsyncSession, user_id: uuid.UUID, day: date, tz_str: str = "UTC") -> float:
     """Total ACTIVE (client-measured, not wall-clock) duration across all 3 activity
-    types for one UTC day -- NOT session_repository.history_for_user, which only
-    looks at typing_sessions (a user who practices only Dictation would never meet
-    the daily goal if we used that). Uses TypingSession.duration_seconds (already
-    server-capped in session_repository.finish) and RecallAttempt/DictationAttempt's
-    own per-round duration_seconds -- never finished_at-started_at, which inflates if
-    a tab is left open idle rather than actually being typed in."""
-    start = datetime.combine(day, time.min, tzinfo=timezone.utc)
-    end = start + timedelta(days=1)
+    types for one calendar day in the user's timezone -- NOT session_repository.history_for_user,
+    which only looks at typing_sessions."""
+    try:
+        tz = ZoneInfo(tz_str)
+    except (ZoneInfoNotFoundError, ValueError):
+        tz = timezone.utc
+
+    start_local = datetime.combine(day, time.min, tzinfo=tz)
+    end_local = start_local + timedelta(days=1)
+    start = start_local.astimezone(timezone.utc)
+    end = end_local.astimezone(timezone.utc)
 
     typing_result = await db.execute(
         select(func.coalesce(func.sum(TypingSession.duration_seconds), 0)).where(

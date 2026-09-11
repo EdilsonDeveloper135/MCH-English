@@ -30,11 +30,17 @@ class RecallSessionOut(BaseModel):
     rounds: list[RoundOut]
 
 
+# A round is a single sentence; anything beyond this is not a real attempt, and the
+# column is unbounded TEXT, so the cap lives here.
+MAX_TYPED_LENGTH = 5_000
+MAX_BLANKS = 100
+
+
 class RecallAttemptCreate(BaseModel):
     recall_session_id: uuid.UUID
     sentence_id: uuid.UUID
-    typed: str
-    blanks: list[BlankOut] | None = None
+    typed: str = Field(max_length=MAX_TYPED_LENGTH)
+    blanks: list[BlankOut] | None = Field(default=None, max_length=MAX_BLANKS)
     correct_characters: int = Field(ge=0)
     incorrect_characters: int = Field(ge=0)
     total_characters: int = Field(ge=0)

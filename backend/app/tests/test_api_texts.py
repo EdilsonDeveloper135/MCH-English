@@ -133,3 +133,22 @@ async def test_update_translation_and_alignment_endpoints(
     assert confirm_res.json()["alignment_status"] == "confirmed"
 
 
+
+
+async def test_progress_is_clamped_to_the_real_chunk_count(
+    client: AsyncClient, auth_headers: dict[str, str], process_text_now
+):
+    """An out-of-range index produced a progress above 100% and made the
+    "text completed" achievement unlockable without practicing anything."""
+    text = await _create_text(client, auth_headers)
+    await process_text_now(text["id"])
+
+    response = await client.patch(
+        f"/texts/{text['id']}/progress",
+        json={"current_chunk_index": 9999, "current_character_index": 0},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["current_chunk_index"] == body["chunk_count"] == 1
+    assert body["progress_percent"] == 100.0

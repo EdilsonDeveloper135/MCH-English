@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -28,8 +28,15 @@ async def _to_vocabulary_outs(db: AsyncSession, items: list[VocabularyItem]) -> 
 
 
 @router.get("", response_model=list[VocabularyItemOut])
-async def list_vocabulary(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    items = await vocabulary_service.get_vocabulary(db, current_user.id)
+async def list_vocabulary(
+    # Paginated: the list used to return every word the user had ever typed, plus a
+    # dictionary lookup with an IN() of the same size, in one response.
+    limit: int = Query(default=500, ge=1, le=2000),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    items = await vocabulary_service.get_vocabulary(db, current_user.id, limit=limit, offset=offset)
     return await _to_vocabulary_outs(db, items)
 
 
@@ -41,10 +48,20 @@ async def list_weak_words(current_user: User = Depends(get_current_user), db: As
 
 @router.post("/weak/session", response_model=WeakWordsSessionOut)
 async def start_weak_words_session(
-    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    # Optional focus word: the Practice screen offers "practicar <palabra>" right after
+    # you mistype it twice, and that word should lead the session even if it is not yet
+    # among the weakest ones.
+    word: str | None = Query(default=None, max_length=255),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     weak_items = await vocabulary_service.get_weak_words(db, current_user.id)
     words = [item.word for item in weak_items]
+
+    focus = (word or "").strip().lower()
+    if focus:
+        words = [focus] + [w for w in words if w != focus]
+
     sentences = await vocabulary_service.build_weak_words_sentences(db, current_user.id, words)
 
     if not sentences:

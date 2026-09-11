@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
+import { useTypingStore } from "@/stores/typingStore";
+import { useApplyTheme } from "@/features/typing/ZenToggle";
 import { api } from "@/services/api";
 
 const NAV_LINKS = [
@@ -11,6 +13,7 @@ const NAV_LINKS = [
   { href: "/vocabulary", label: "Vocabulary" },
   { href: "/progress", label: "Progress" },
   { href: "/gamification", label: "Gamification" },
+  { href: "/settings", label: "Settings" },
 ];
 
 const SESSION_PREFIXES = ["/practice", "/recall", "/dictation"];
@@ -20,7 +23,11 @@ export function AppHeader() {
   const pathname = usePathname();
   const token = useAuthStore((s) => s.token);
   const logout = useAuthStore((s) => s.logout);
+  const isFocusMode = useTypingStore((s) => s.isFocusMode);
   const [isOpen, setIsOpen] = useState(false);
+
+  // Mounted on every page, so this is where the saved theme gets applied.
+  useApplyTheme();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -35,13 +42,22 @@ export function AppHeader() {
 
   if (SESSION_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
     return (
-      <div className="sticky top-0 z-10 bg-black px-6 py-3 border-b border-neutral-900">
-        <Link
-          href="/library"
-          className="text-sm text-gray-400 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none rounded px-2 py-1 inline-block"
-        >
-          ← Salir / Volver a Biblioteca
-        </Link>
+      <div
+        className={`sticky top-0 z-10 bg-black px-6 py-3 border-b border-neutral-900 transition-opacity duration-300 ${
+          isFocusMode ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <Link
+            href="/library"
+            className="text-sm text-gray-400 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none rounded px-2 py-1 inline-block"
+          >
+            ← Salir / Volver a Biblioteca
+          </Link>
+          <span className="text-xs text-gray-600 font-mono hidden md:block">
+            ⌘K — Command Palette
+          </span>
+        </div>
       </div>
     );
   }
@@ -84,6 +100,10 @@ export function AppHeader() {
               </Link>
             );
           })}
+          {/* A hint, not a control: the palette opens with the keyboard shortcut. */}
+          <span className="text-gray-600 font-mono text-xs border border-gray-800 rounded px-1.5 py-0.5" title="Paleta de comandos (⌘K / Ctrl+K)">
+            ⌘K
+          </span>
           <button
             type="button"
             onClick={handleLogout}
@@ -149,4 +169,3 @@ export function AppHeader() {
     </header>
   );
 }
-

@@ -7,7 +7,11 @@ import { api } from "@/services/api";
 import { LineChartCard } from "@/features/progress/LineChartCard";
 import { BarChartCard } from "@/features/progress/BarChartCard";
 import { WeakWordsChart } from "@/features/progress/WeakWordsChart";
+import { KeyboardHeatmap } from "@/features/typing/components/KeyboardHeatmap";
+import { PersonalGoals } from "@/features/progress/PersonalGoals";
 import type { HistoryPointDTO, OverviewStatsDTO, VocabularyBucketDTO, VocabularyItemDTO } from "@/types";
+
+type TimeRange = "today" | "7d" | "30d" | "all";
 
 function formatDay(iso: string): string {
   const [, month, day] = iso.split("-");
@@ -19,6 +23,7 @@ export default function ProgressPage() {
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
 
+  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
   const [stats, setStats] = useState<OverviewStatsDTO | null>(null);
   const [history, setHistory] = useState<HistoryPointDTO[] | null>(null);
   const [distribution, setDistribution] = useState<VocabularyBucketDTO[] | null>(null);
@@ -56,9 +61,46 @@ export default function ProgressPage() {
     loadData();
   }, [hasHydrated, token, router]);
 
+  // Filter history based on time range
+  const filteredHistory = (history || []).filter((item, index, arr) => {
+    if (timeRange === "today") return index === arr.length - 1;
+    if (timeRange === "7d") return index >= arr.length - 7;
+    if (timeRange === "30d") return index >= arr.length - 30;
+    return true; // all
+  });
+
   return (
-    <div className="min-h-screen px-6 py-10 max-w-3xl mx-auto">
-      <h1 className="text-xl font-semibold text-white mb-8">Progress</h1>
+    <div className="min-h-screen px-6 py-10 max-w-4xl mx-auto space-y-10">
+      {/* Header with Time Range Tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-900 pb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Progreso y Rendimiento</h1>
+          <p className="text-sm text-neutral-400 mt-1">Analítica detallada de velocidad, precisión y memoria muscular.</p>
+        </div>
+
+        {/* Time Period Filter */}
+        <div className="flex bg-neutral-900/80 p-1 rounded-xl border border-neutral-800 text-xs font-medium self-start sm:self-auto">
+          {[
+            { id: "today", label: "Hoy" },
+            { id: "7d", label: "7 días" },
+            { id: "30d", label: "30 días" },
+            { id: "all", label: "Todo" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setTimeRange(tab.id as TimeRange)}
+              className={`px-3 py-1.5 rounded-lg transition-colors ${
+                timeRange === tab.id
+                  ? "bg-[var(--accent)] text-black font-semibold shadow-sm"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {error ? (
         <div className="bg-red-950/40 border border-red-900/60 rounded-xl p-6 text-center my-8">
@@ -72,58 +114,62 @@ export default function ProgressPage() {
           </button>
         </div>
       ) : loading || !stats || !history || !distribution || !weakWords ? (
-        <p className="text-gray-400 text-sm">Cargando...</p>
+        <div className="py-20 text-center text-neutral-500 font-mono text-sm animate-pulse">
+          Cargando métricas y análisis de teclado...
+        </div>
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-12">
+          {/* Hero Performance Overview */}
           <section>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">Typing</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <Stat label="WPM actual" value={stats.current_wpm} />
-              <Stat label="WPM promedio" value={stats.average_wpm} />
-              <Stat label="Mejor WPM" value={stats.best_wpm} />
-              <Stat label="Precision promedio" value={`${stats.average_accuracy}%`} />
-              <Stat label="Tiempo practicado" value={`${Math.round(stats.total_practice_seconds / 60)} min`} />
-              <Stat label="Errores" value={stats.total_errors} />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <StatCard label="WPM Actual" value={stats.current_wpm} subtitle="Última sesión" highlight />
+              <StatCard label="WPM Promedio" value={stats.average_wpm} subtitle="Histórico general" />
+              <StatCard label="Mejor WPM" value={stats.best_wpm} subtitle="Récord personal" />
+              <StatCard label="Precisión Media" value={`${stats.average_accuracy}%`} subtitle="Consistencia global" />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+              <StatCard label="Tiempo Total" value={`${Math.round(stats.total_practice_seconds / 60)} min`} />
+              <StatCard label="Sesiones Completadas" value={stats.total_sessions} />
+              <StatCard label="Errores Registrados" value={stats.total_errors} />
+              <StatCard label="Palabras Dominadas" value={`${stats.words_learned} / ${stats.words_encountered}`} />
             </div>
           </section>
 
-          <section>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">English</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <Stat label="Palabras encontradas" value={stats.words_encountered} />
-              <Stat label="Palabras aprendidas" value={stats.words_learned} />
-              <Stat label="Palabras debiles" value={stats.weak_words_count} />
-              <Stat label="Precision en Recall" value={`${stats.average_recall_accuracy}%`} />
-              <Stat label="Precision en Dictation" value={`${stats.average_dictation_accuracy}%`} />
-              <Stat label="Oraciones completadas" value={stats.sentences_completed} />
+          {/* Interactive Keyboard Heatmap (Teclas Débiles) */}
+          <section className="bg-neutral-950/80 border border-neutral-900 rounded-2xl p-6 shadow-xl">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-white">Mapa de Calor del Teclado (Teclas Débiles)</h2>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Identifica tus teclas lentas o con mayor tasa de error a partir de tus sesiones de práctica.
+              </p>
             </div>
+            <KeyboardHeatmap />
           </section>
 
+          {/* Objetivos personales, medidos contra las estadísticas reales del usuario */}
           <section>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <Stat label="Sesiones completadas" value={stats.total_sessions} />
-              <Stat label="Textos listos" value={`${stats.texts_ready} / ${stats.texts_count}`} />
-            </div>
+            <PersonalGoals currentWpm={stats.current_wpm} currentAccuracy={stats.average_accuracy} />
           </section>
 
-          <section>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">Graficos</p>
-            <div className="grid gap-4">
+          {/* Graphical Trends */}
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold text-white">Evolución Gráfica</h2>
+            <div className="grid gap-6">
               <LineChartCard
-                title="WPM en el tiempo"
-                points={history.map((h) => ({ label: formatDay(h.date), value: h.average_wpm }))}
+                title={`WPM en el tiempo (${timeRange.toUpperCase()})`}
+                points={filteredHistory.map((h) => ({ label: formatDay(h.date), value: h.average_wpm }))}
               />
               <LineChartCard
-                title="Precision en el tiempo"
-                points={history.map((h) => ({ label: formatDay(h.date), value: h.average_accuracy }))}
+                title={`Precisión en el tiempo (${timeRange.toUpperCase()})`}
+                points={filteredHistory.map((h) => ({ label: formatDay(h.date), value: h.average_accuracy }))}
                 unit="%"
               />
               <BarChartCard
-                title="Tiempo de practica (min/dia)"
-                bars={history.map((h) => ({ label: formatDay(h.date), value: Math.round(h.practice_seconds / 60) }))}
+                title={`Tiempo de práctica diario (minutos)`}
+                bars={filteredHistory.map((h) => ({ label: formatDay(h.date), value: Math.round(h.practice_seconds / 60) }))}
               />
               <BarChartCard
-                title="Dominio de vocabulario"
+                title="Distribución de Dominio de Vocabulario"
                 bars={distribution.map((b) => ({ label: b.range, value: b.count }))}
                 emptyWhenAllZero
               />
@@ -136,11 +182,28 @@ export default function ProgressPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+function StatCard({
+  label,
+  value,
+  subtitle,
+  highlight = false,
+}: {
+  label: string;
+  value: string | number;
+  subtitle?: string;
+  highlight?: boolean;
+}) {
   return (
-    <div className="border border-gray-800 rounded p-4">
-      <p className="text-2xl text-white">{value}</p>
-      <p className="text-xs text-gray-400 mt-1">{label}</p>
+    <div
+      className={`border rounded-xl p-4 transition-all ${
+        highlight
+          ? "border-[var(--accent)]/40 bg-[var(--accent)]/5"
+          : "border-neutral-800/80 bg-neutral-900/30"
+      }`}
+    >
+      <p className="text-2xl font-bold font-mono text-white tracking-tight">{value}</p>
+      <p className="text-xs text-neutral-400 mt-1 font-medium">{label}</p>
+      {subtitle && <p className="text-[10px] text-neutral-500 mt-0.5">{subtitle}</p>}
     </div>
   );
 }

@@ -1,10 +1,15 @@
 import uuid
 
+import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories import text_repository
 from app.services.chunking_service import clean_text, count_words
 from app.workers.jobs import enqueue_process_text
+
+logger = structlog.get_logger(__name__)
+
+ENQUEUE_ERROR_MESSAGE = "No se pudo encolar el procesamiento. Borra el texto y vuelve a subirlo."
 
 
 async def create_text(
@@ -27,5 +32,15 @@ async def create_text(
         word_count=word_count,
         translation_content=(translation_content or "").strip() or None,
     )
-    enqueue_process_text(str(text.id))
+
+    try:
+        enqueue_process_text(str(text.id))
+    except Exception as exc:  # noqa: BLE001
+        # The row is already committed; without this the text would sit in `pending`
+        # forever with no worker ever picking it up and no way to tell from the UI.
+        logger.error("text_enqueue_failed", text_id=str(text.id), error=str(exc))
+        text.status = "failed"
+        text.error_message = ENQUEUE_ERROR_MESSAGE
+        await db.commit()
+
     return text

@@ -71,6 +71,12 @@ async def finish_session(
     if session is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
+    # Finishing twice would insert the error rows a second time and count every word
+    # of the chunk as another encounter, quietly distorting the mastery scores that
+    # Weak Words and Recall are built on.
+    if session.finished_at is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Esta sesion ya fue finalizada")
+
     accuracy = calculate_accuracy(payload.correct_characters, payload.total_characters)
     wpm = calculate_wpm(payload.total_characters, payload.duration_seconds)
 

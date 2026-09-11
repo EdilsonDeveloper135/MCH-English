@@ -94,3 +94,24 @@ async def test_login_rate_limiting_returns_429_after_limit_exceeded(client: Asyn
     finally:
         limiter.enabled = False
 
+
+
+async def test_logout_requires_a_valid_token(client: AsyncClient):
+    """The endpoint used to blacklist whatever string it was given, without checking
+    it, letting an unauthenticated caller write arbitrary keys into Redis."""
+    response = await client.post("/auth/logout", headers={"Authorization": "Bearer not-a-real-jwt"})
+    assert response.status_code == 401
+
+    without_header = await client.post("/auth/logout")
+    assert without_header.status_code == 401
+
+
+async def test_email_is_case_insensitive_across_register_and_login(client: AsyncClient):
+    register = await client.post("/auth/register", json={"email": "Mixed.Case@Example.com", "password": "testpass123"})
+    assert register.status_code == 201
+
+    duplicate = await client.post("/auth/register", json={"email": "mixed.case@example.com", "password": "testpass123"})
+    assert duplicate.status_code == 409
+
+    login = await client.post("/auth/login", json={"email": "MIXED.CASE@example.com", "password": "testpass123"})
+    assert login.status_code == 200

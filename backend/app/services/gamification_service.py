@@ -3,10 +3,11 @@ import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Callable
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.repositories import gamification_repository, text_repository
+from app.repositories import gamification_repository, settings_repository, text_repository
 from app.services import statistics_service
 
 XP_PER_LEVEL_STEP = 300  # one normal Practice chunk (60-80 words / 300-400 correct
@@ -19,8 +20,7 @@ def compute_streak(active_dates: list[date], today: date) -> tuple[int, int]:
     Not having activity TODAY yet does not break the current streak (the day isn't
     over) -- only a missed *yesterday* (with nothing today either) does. A gap
     earlier in history affects longest_streak only, never current_streak. `today`
-    should be datetime.now(timezone.utc).date(), matching how finished_at is written
-    everywhere else in this codebase (no per-user timezone is tracked)."""
+    is the user's current calendar date in their configured timezone."""
     if not active_dates:
         return 0, 0
 
@@ -106,15 +106,24 @@ ACHIEVEMENTS: list[Achievement] = [
 ]
 
 
-async def get_gamification_overview(db: AsyncSession, user_id: uuid.UUID) -> dict:
+async def get_gamification_overview(db: AsyncSession, user_id: uuid.UUID, tz_str: str | None = None) -> dict:
     """Composes on top of statistics_service.get_overview without changing its
     return shape, so /statistics/* and the Progress page stay unaffected by
     anything here."""
     texts = await text_repository.list_by_user(db, user_id)
     overview = await statistics_service.get_overview(db, user_id, texts=texts)
 
-    active_dates = await gamification_repository.get_active_dates(db, user_id)
-    today = datetime.now(timezone.utc).date()
+    if tz_str is None:
+        settings = await settings_repository.get_or_create(db, user_id)
+        tz_str = settings.timezone or "UTC"
+
+    try:
+        tz = ZoneInfo(tz_str)
+    except (ZoneInfoNotFoundError, ValueError):
+        tz = timezone.utc
+
+    active_dates = await gamification_repository.get_active_dates(db, user_id, tz_str=tz_str)
+    today = datetime.now(tz).date()
     current_streak, longest_streak = compute_streak(active_dates, today)
 
     typing_xp = await gamification_repository.total_typing_xp(db, user_id)

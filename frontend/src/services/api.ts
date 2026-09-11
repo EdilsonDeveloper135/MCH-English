@@ -66,17 +66,17 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
 
-  // Only an *authenticated* request rejected with 401 means the token itself is
+  // Only an *authenticated* request rejected with 401/403 means the token itself is
   // expired/revoked -- /auth/login and /auth/register also return 401/409 for wrong
   // credentials, but those requests never carry a token, so `token` being set here
   // is what distinguishes "your session died" from "you typed the wrong password".
-  if (response.status === 401 && token) {
+  if ((response.status === 401 || response.status === 403) && token) {
     // Every page already redirects to /login once the store's token goes null
     // (each page's hasHydrated/token effect), so clearing it here is enough to get
     // the user off an indefinite loading screen instead of a full page reload.
     const message = "Tu sesion expiro. Inicia sesion de nuevo.";
     useAuthStore.getState().logout(message);
-    throw new ApiError(401, message);
+    throw new ApiError(response.status, message);
   }
 
   if (!response.ok) {
@@ -145,10 +145,19 @@ export const api = {
       body: JSON.stringify({ text_id, chunk_id }),
     }),
 
+  // Only the fields the API defines: the typing engine's stats object also carries the
+  // full per-character state and the WPM history, which the server ignores and which
+  // would otherwise travel on every finished session.
   finishSession: (sessionId: string, stats: FinishSessionPayload) =>
     request<SessionDTO>(`/sessions/${sessionId}`, {
       method: "PATCH",
-      body: JSON.stringify(stats),
+      body: JSON.stringify({
+        correct_characters: stats.correct_characters,
+        incorrect_characters: stats.incorrect_characters,
+        total_characters: stats.total_characters,
+        duration_seconds: stats.duration_seconds,
+        errors: stats.errors,
+      }),
     }),
 
   getOverview: () => request<OverviewStatsDTO>("/statistics/overview"),
@@ -160,7 +169,11 @@ export const api = {
 
   getSettings: () => request<UserSettingsDTO>("/settings"),
 
-  updateSettings: (updates: { translation_mode?: TranslationMode; daily_goal_minutes?: number }) =>
+  updateSettings: (updates: {
+    translation_mode?: TranslationMode;
+    daily_goal_minutes?: number;
+    timezone?: string;
+  }) =>
     request<UserSettingsDTO>("/settings", {
       method: "PATCH",
       body: JSON.stringify(updates),
@@ -220,7 +233,11 @@ export const api = {
 
   getWeakWords: () => request<VocabularyItemDTO[]>("/vocabulary/weak"),
 
-  startWeakWordsSession: () => request<WeakWordsSessionDTO>("/vocabulary/weak/session", { method: "POST" }),
+  startWeakWordsSession: (word?: string) =>
+    request<WeakWordsSessionDTO>(
+      `/vocabulary/weak/session${word ? `?word=${encodeURIComponent(word)}` : ""}`,
+      { method: "POST" }
+    ),
 
   createRecallSession: (text_id: string, mode: RecallMode) =>
     request<RecallSessionDTO>("/recall/sessions", {

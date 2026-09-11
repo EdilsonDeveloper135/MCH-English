@@ -44,6 +44,7 @@ export default function AlignmentReviewPage() {
   const [inputs, setInputs] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -51,20 +52,24 @@ export default function AlignmentReviewPage() {
       router.replace("/login");
       return;
     }
-    api.getAlignment(textId).then((alignment) => {
-      setData(alignment);
-      const byEnglish = new Map<number, number[]>();
-      for (const link of alignment.links) {
-        const list = byEnglish.get(link.english_index) ?? [];
-        list.push(link.spanish_index);
-        byEnglish.set(link.english_index, list);
-      }
-      const initial: Record<number, string> = {};
-      alignment.english_sentences.forEach((s) => {
-        initial[s.index] = formatIndices(byEnglish.get(s.index) ?? []);
-      });
-      setInputs(initial);
-    }).catch(() => {});
+    api
+      .getAlignment(textId)
+      .then((alignment) => {
+        setData(alignment);
+        const byEnglish = new Map<number, number[]>();
+        for (const link of alignment.links) {
+          const list = byEnglish.get(link.english_index) ?? [];
+          list.push(link.spanish_index);
+          byEnglish.set(link.english_index, list);
+        }
+        const initial: Record<number, string> = {};
+        alignment.english_sentences.forEach((s) => {
+          initial[s.index] = formatIndices(byEnglish.get(s.index) ?? []);
+        });
+        setInputs(initial);
+      })
+      // Swallowing this left the screen on "Cargando..." with no explanation.
+      .catch(() => setLoadError("No se pudo cargar la alineacion de este texto."));
   }, [hasHydrated, token, textId, router]);
 
   const spanishByIndex = useMemo(() => {
@@ -95,6 +100,21 @@ export default function AlignmentReviewPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  if (loadError) {
+    return (
+      <div className="p-10 flex flex-col items-start gap-4">
+        <p className="text-red-300 text-sm">{loadError}</p>
+        <button
+          type="button"
+          onClick={() => router.push("/library")}
+          className="bg-white text-black rounded px-4 py-2 text-sm font-medium focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+        >
+          Volver a la biblioteca
+        </button>
+      </div>
+    );
   }
 
   if (!data) return <p className="text-gray-400 text-sm p-10">Cargando...</p>;

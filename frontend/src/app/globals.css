@@ -5,45 +5,65 @@
 :root {
   --bg-primary: #000000;
   --bg-surface: #0a0a0a;
+  --border-color: #262626;
+  --bg-surface-blur: rgba(10, 10, 10, 0.8);
   --text-primary: #e5e7eb;
   --text-muted: #9ca3af;
   --accent: #22d3ee;
   --char-pending: #9ca3af;
   --char-correct: #ffffff;
   --char-incorrect: #ef4444;
+  --char-incorrect-rgb: 239, 68, 68;
+  --text-correct: #f59e0b;
+  --text-error: #f87171;
 }
 
 [data-theme="nord"] {
   --bg-primary: #1e222a;
   --bg-surface: #282c34;
+  --border-color: #3b4252;
+  --bg-surface-blur: rgba(40, 44, 52, 0.8);
   --text-primary: #eceff4;
   --text-muted: #88c0d0;
   --accent: #88c0d0;
   --char-pending: #616e88;
   --char-correct: #eceff4;
   --char-incorrect: #bf616a;
+  --char-incorrect-rgb: 191, 97, 106;
+  --text-correct: #ebcb8b;
+  --text-error: #bf616a;
 }
 
 [data-theme="catppuccin"] {
   --bg-primary: #1e1e2e;
   --bg-surface: #181825;
+  --border-color: #313244;
+  --bg-surface-blur: rgba(24, 24, 37, 0.8);
   --text-primary: #cdd6f4;
   --text-muted: #a6adc8;
   --accent: #89b4fa;
   --char-pending: #6c7086;
   --char-correct: #cdd6f4;
   --char-incorrect: #f38ba8;
+  --char-incorrect-rgb: 243, 139, 168;
+  --text-correct: #f9e2af;
+  --text-error: #f38ba8;
 }
 
 [data-theme="sepia"] {
   --bg-primary: #fbf1c7;
   --bg-surface: #ebdbb2;
+  --border-color: #d5c4a1;
+  --bg-surface-blur: rgba(235, 219, 178, 0.8);
   --text-primary: #3c3836;
   --text-muted: #7c6f64;
   --accent: #b57614;
   --char-pending: #928374;
   --char-correct: #282828;
   --char-incorrect: #cc241d;
+  --char-incorrect-rgb: 204, 36, 29;
+  --text-correct: #b57614;
+  --text-error: #cc241d;
 }
 
 html,
@@ -54,6 +74,10 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* ═══════════════════════════════════════════════
+   Caret Animation
+   ═══════════════════════════════════════════════ */
+
 @keyframes caret-blink {
   0%, 100% {
     opacity: 1;
@@ -62,6 +86,99 @@ body {
     opacity: 0;
   }
 }
+
+/* ═══════════════════════════════════════════════
+   New Animations for UX Redesign
+   ═══════════════════════════════════════════════ */
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+  50% { box-shadow: 0 0 12px 2px rgba(245, 158, 11, 0.15); }
+}
+
+/* ═══════════════════════════════════════════════
+   Reduce Motion — Global Overrides
+   ═══════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Manual reduce-motion via data attribute (for user preference override) */
+[data-reduce-motion="true"] *,
+[data-reduce-motion="true"] *::before,
+[data-reduce-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* ═══════════════════════════════════════════════
+   Focus Mode Transitions
+   ═══════════════════════════════════════════════ */
+
+.focus-hide {
+  transition: opacity 300ms ease, transform 300ms ease;
+}
+
+.focus-hide.focus-active {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focus-hide.focus-active {
+    transform: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   Typing Area Overrides
+   ═══════════════════════════════════════════════ */
 
 /* When SmoothCaret is running inside typing areas, suppress legacy inline border to avoid double-carets */
 .cursor-text [data-char-index] {
@@ -93,5 +210,33 @@ body {
   color: #6c7086 !important;
 }
 
+/* ═══════════════════════════════════════════════
+   Command Palette Backdrop
+   ═══════════════════════════════════════════════ */
 
+.command-palette-backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
 
+/* ═══════════════════════════════════════════════
+   Custom Scrollbar
+   ═══════════════════════════════════════════════ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
