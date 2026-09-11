@@ -6,7 +6,7 @@ Resumen técnico conciso de cómo está armado MCH-English y cómo fluyen los da
 
 ```
                          ┌──────────────────────────┐
-                         │   Frontend (Next.js 14)  │
+                         │   Frontend (Next.js 15)  │
                          │  App Router + Zustand    │
                          │  http://localhost:3000   │
                          └────────────┬─────────────┘
@@ -62,6 +62,6 @@ Todo el pipeline de idioma es determinístico y auditable línea por línea:
 
 ## Testing
 
-- **Backend**: 104 tests (`pytest`) — unitarios de servicios puros (chunking, alignment, gamification, vocabulary) + integración HTTP end-to-end contra una base Postgres de test real y separada (`app/tests/conftest.py` crea y destruye `mch_english_test` en cada corrida), cubriendo auth, texts, sessions, recall, dictation, vocabulary, settings, gamification y dictionary.
+- **Backend**: 105 tests (`pytest`) — unitarios de servicios puros (chunking, alignment, gamification, vocabulary) + integración HTTP end-to-end contra una base Postgres de test real y separada (`app/tests/conftest.py` crea y destruye `mch_english_test` en cada corrida), cubriendo auth, texts, sessions, recall, dictation, vocabulary, settings, gamification y dictionary.
 - **Frontend**: 67 tests (`vitest` + Testing Library) — el motor de tipeo (Backspace, Ctrl+Backspace, WPM, detección de palabra), render de componentes (`TypingText`, `ConfirmModal`, `AppHeader`, `MissingWordsText`, `SentenceInfoPanel`), y manejo de errores/caché de `api.ts`.
 - **CI** (`.github/workflows/ci.yml`): lint + tipos + tests de frontend, pytest de backend contra Postgres/Redis reales de CI (incluye verificar que el historial completo de migraciones de Alembic aplica limpio desde cero), y build de ambos Dockerfiles — en cada push/PR a `main`.

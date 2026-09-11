@@ -4,12 +4,12 @@
 
 MCH-English es una app de práctica de mecanografía en inglés diseñada para construir memoria muscular real: cada palabra que fallás queda registrada como vocabulario débil, cada sesión suma XP y racha, y todo el pipeline de idioma — traducción, alineación de oraciones, diccionario, voz — es determinístico y corre localmente. **Cero IA generativa, cero APIs externas de traducción o de voz, cero dependencias opacas.**
 
-[![Next.js](https://img.shields.io/badge/Next.js-14.2-black?logo=next.js)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15.5-black?logo=next.js)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.141-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![Backend tests](https://img.shields.io/badge/pytest-104%2F104-brightgreen?logo=pytest&logoColor=white)](./docs/ARCHITECTURE.md#testing)
+[![Backend tests](https://img.shields.io/badge/pytest-105%2F105-brightgreen?logo=pytest&logoColor=white)](./docs/ARCHITECTURE.md#testing)
 [![Frontend tests](https://img.shields.io/badge/vitest-67%2F67-brightgreen?logo=vitest&logoColor=white)](./docs/ARCHITECTURE.md#testing)
 [![CI](https://github.com/EdilsonDeveloper135/MCH-English/actions/workflows/ci.yml/badge.svg)](https://github.com/EdilsonDeveloper135/MCH-English/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
@@ -44,7 +44,7 @@ Las apps de mecanografía (Monkeytype, Keybr, TypeRacer) son excelentes para vel
 ```mermaid
 flowchart LR
     subgraph Cliente
-        FE["Frontend — Next.js 14\nZustand + App Router"]
+        FE["Frontend — Next.js 15\nZustand + App Router"]
     end
     subgraph Servidor
         BE["Backend — FastAPI\nSQLAlchemy async"]
@@ -107,7 +107,7 @@ producción: `standalone`, sin devDependencies ni código fuente):
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
-# Tests de backend (104 tests)
+# Tests de backend (105 tests)
 docker exec mch-english-backend-1 pytest -v
 
 # Tests de frontend (67 tests)
@@ -132,7 +132,7 @@ docker compose logs -f backend
 
 ```
 MCH-English/
-├── frontend/          # Next.js 14 (App Router) + TypeScript + Tailwind + Zustand
+├── frontend/          # Next.js 15 (App Router) + TypeScript + Tailwind + Zustand
 ├── backend/           # FastAPI + SQLAlchemy async + Alembic + Pydantic v2
 │   ├── app/
 │   │   ├── api/       # Routers HTTP
