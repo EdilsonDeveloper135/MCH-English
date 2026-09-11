@@ -1,5 +1,7 @@
 import asyncio
 import os
+import shutil
+import tempfile
 import uuid
 
 import pytest
@@ -17,6 +19,12 @@ from sqlalchemy.ext.asyncio import create_async_engine
 _BASE_DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@postgres:5432/mch_english")
 _TEST_DATABASE_URL = _BASE_DATABASE_URL.rsplit("/", 1)[0] + "/mch_english_test"
 os.environ["DATABASE_URL"] = _TEST_DATABASE_URL
+
+# The dictation cache defaults to /app/audio_cache, a path that only exists inside the
+# backend image: outside it the suite failed, and inside it wrote real WAVs into the
+# mounted volume. A throwaway directory makes the tests hermetic on any host.
+_TEST_AUDIO_CACHE_DIR = tempfile.mkdtemp(prefix="mch-english-audio-cache-")
+os.environ["AUDIO_CACHE_DIR"] = _TEST_AUDIO_CACHE_DIR
 
 
 def _admin_database_url() -> str:
@@ -44,6 +52,12 @@ from app.main import app as fastapi_app, limiter  # noqa: E402
 app_settings.rate_limit_enabled = False
 limiter.enabled = False
 
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _cleanup_audio_cache_dir():
+    yield
+    shutil.rmtree(_TEST_AUDIO_CACHE_DIR, ignore_errors=True)
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
