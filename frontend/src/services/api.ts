@@ -169,7 +169,11 @@ export const api = {
 
   getSettings: () => request<UserSettingsDTO>("/settings"),
 
-  updateSettings: (updates: { translation_mode?: TranslationMode; daily_goal_minutes?: number }) =>
+  updateSettings: (updates: {
+    translation_mode?: TranslationMode;
+    daily_goal_minutes?: number;
+    timezone?: string;
+  }) =>
     request<UserSettingsDTO>("/settings", {
       method: "PATCH",
       body: JSON.stringify(updates),

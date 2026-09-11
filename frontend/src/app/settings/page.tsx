@@ -32,6 +32,9 @@ export default function SettingsPage() {
   const [goalDraft, setGoalDraft] = useState("");
   const [goalStatus, setGoalStatus] = useState<string | null>(null);
 
+  const [timezone, setTimezone] = useState<string>("UTC");
+  const [tzStatus, setTzStatus] = useState<string | null>(null);
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -48,6 +51,7 @@ export default function SettingsPage() {
       .then((s) => {
         setDailyGoal(s.daily_goal_minutes);
         setGoalDraft(String(s.daily_goal_minutes));
+        setTimezone(s.timezone || "UTC");
       })
       .catch(() => setGoalStatus("No se pudieron cargar los ajustes de la cuenta."));
   }, [hasHydrated, token]);
@@ -64,6 +68,28 @@ export default function SettingsPage() {
       setGoalStatus("Objetivo diario actualizado.");
     } catch {
       setGoalStatus("No se pudo guardar el objetivo diario.");
+    }
+  }
+
+  async function saveTimezone(newTz: string) {
+    try {
+      const updated = await api.updateSettings({ timezone: newTz });
+      setTimezone(updated.timezone);
+      setTzStatus("Zona horaria actualizada.");
+    } catch {
+      setTzStatus("No se pudo guardar la zona horaria.");
+    }
+  }
+
+  function detectTimezone() {
+    try {
+      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (detected) {
+        setTimezone(detected);
+        saveTimezone(detected);
+      }
+    } catch {
+      setTzStatus("No se pudo detectar la zona horaria del navegador.");
     }
   }
 
@@ -379,6 +405,50 @@ export default function SettingsPage() {
               </button>
             </div>
             {goalStatus && <p className="text-xs text-text-muted">{goalStatus}</p>}
+          </section>
+
+          <section className={SECTION_CLASS}>
+            <h2 className="text-lg font-semibold text-text-primary border-b border-surface-border pb-2">
+              Zona horaria
+            </h2>
+            <p className="text-sm text-text-muted">
+              Define el corte de día para el cómputo de tus rachas y objetivos diarios.
+            </p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <label htmlFor="pref-timezone" className="sr-only">
+                Zona horaria
+              </label>
+              <select
+                id="pref-timezone"
+                value={timezone}
+                onChange={(e) => saveTimezone(e.target.value)}
+                className={`${SELECT_CLASS} max-w-xs`}
+              >
+                <option value="UTC">UTC (Tiempo Universal)</option>
+                <option value="America/Lima">America/Lima (UTC-5)</option>
+                <option value="America/Bogota">America/Bogota (UTC-5)</option>
+                <option value="America/Santiago">America/Santiago (UTC-3 / UTC-4)</option>
+                <option value="America/Buenos_Aires">America/Buenos_Aires (UTC-3)</option>
+                <option value="America/Mexico_City">America/Mexico_City (UTC-6)</option>
+                <option value="America/New_York">America/New_York (UTC-4 / UTC-5)</option>
+                <option value="America/Chicago">America/Chicago (UTC-5 / UTC-6)</option>
+                <option value="America/Los_Angeles">America/Los_Angeles (UTC-7 / UTC-8)</option>
+                <option value="Europe/Madrid">Europe/Madrid (UTC+1 / UTC+2)</option>
+                <option value="Europe/London">Europe/London (UTC+0 / UTC+1)</option>
+                <option value="Asia/Tokyo">Asia/Tokyo (UTC+9)</option>
+                {!["UTC", "America/Lima", "America/Bogota", "America/Santiago", "America/Buenos_Aires", "America/Mexico_City", "America/New_York", "America/Chicago", "America/Los_Angeles", "Europe/Madrid", "Europe/London", "Asia/Tokyo"].includes(timezone) && (
+                  <option value={timezone}>{timezone}</option>
+                )}
+              </select>
+              <button
+                type="button"
+                onClick={detectTimezone}
+                className="bg-neutral-800 text-text-primary text-xs font-medium px-3 py-2 rounded hover:bg-neutral-700 transition-colors focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+              >
+                Detectar mi zona horaria
+              </button>
+            </div>
+            {tzStatus && <p className="text-xs text-text-muted">{tzStatus}</p>}
           </section>
         </div>
       </div>

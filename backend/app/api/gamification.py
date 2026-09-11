@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,11 +16,20 @@ router = APIRouter()
 
 @router.get("/overview", response_model=GamificationOverview)
 async def overview(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    stats = await get_gamification_overview(db, current_user.id)
     settings = await settings_repository.get_or_create(db, current_user.id)
+    user_tz = settings.timezone or "UTC"
+    stats = await get_gamification_overview(db, current_user.id, tz_str=user_tz)
     unlocked = await gamification_repository.get_unlocked_achievement_ids(db, current_user.id)
-    today = datetime.now(timezone.utc).date()
-    practice_seconds_today = await gamification_repository.practice_seconds_on(db, current_user.id, today)
+
+    try:
+        tz = ZoneInfo(user_tz)
+    except (ZoneInfoNotFoundError, ValueError):
+        tz = timezone.utc
+
+    today = datetime.now(tz).date()
+    practice_seconds_today = await gamification_repository.practice_seconds_on(
+        db, current_user.id, today, tz_str=user_tz
+    )
 
     return GamificationOverview(
         level=stats["level"],
