@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { memo, useEffect, useState, useRef } from 'react';
 import { useTypingStore } from '@/stores/typingStore';
 
 interface LiveStatsProps {
@@ -15,7 +15,7 @@ interface LiveStatsProps {
   isFocused?: boolean;
 }
 
-export function LiveStats({
+export const LiveStats = memo(function LiveStats({
   wpm,
   rawWpm = 0,
   accuracy,
@@ -39,11 +39,10 @@ export function LiveStats({
     
     pastWpms.current = pastWpms.current.filter(entry => now - entry.time <= 5000);
     
-    if (pastWpms.current.length > 0) {
+    if (pastWpms.current.length > 1) {
       const oldWpm = pastWpms.current[0].wpm;
-      if (wpm > oldWpm) setTrend('up');
-      else if (wpm < oldWpm) setTrend('down');
-      else setTrend('same');
+      const nextTrend = wpm > oldWpm ? 'up' : wpm < oldWpm ? 'down' : 'same';
+      setTrend(nextTrend);
     }
   }, [wpm]);
 
@@ -105,4 +104,4 @@ export function LiveStats({
       )}
     </div>
   );
-}
+});

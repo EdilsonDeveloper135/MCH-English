@@ -58,3 +58,10 @@ def test_word_tokenization_supports_unicode_and_hyphenated_words():
     assert "résumé" in words
     assert "it’s" in words
 
+
+def test_split_sentences_handles_ellipsis_and_quotes():
+    paragraph = 'He waited… Nothing happened. "Are you sure?" She asked.'
+    sentences = split_sentences(paragraph)
+    assert sentences == ["He waited…", "Nothing happened.", '"Are you sure?"', "She asked."]
+
+

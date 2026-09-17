@@ -61,13 +61,42 @@ export function useZenMode() {
 export function ThemeSelector() {
   const { theme, setTheme, themes } = useTheme();
 
+  const applyPreview = (id: Theme) => {
+    if (typeof document === "undefined") return;
+    if (id === "oled") {
+      document.documentElement.removeAttribute("data-theme");
+    } else {
+      document.documentElement.setAttribute("data-theme", id);
+    }
+  };
+
+  const restoreTheme = () => {
+    if (typeof document === "undefined") return;
+    if (theme === "oled") {
+      document.documentElement.removeAttribute("data-theme");
+    } else {
+      document.documentElement.setAttribute("data-theme", theme);
+    }
+  };
+
   return (
-    <div className="flex items-center gap-1" role="group" aria-label="Tema de color">
+    <div
+      className="flex items-center gap-1"
+      role="group"
+      aria-label="Tema de color"
+      onMouseLeave={restoreTheme}
+    >
       {themes.map((t) => (
         <button
           key={t.id}
           type="button"
-          onClick={() => setTheme(t.id)}
+          onClick={() => {
+            setTheme(t.id);
+            applyPreview(t.id);
+          }}
+          onMouseEnter={() => applyPreview(t.id)}
+          onFocus={() => applyPreview(t.id)}
+          onBlur={restoreTheme}
           aria-label={`Tema ${t.label}`}
           aria-pressed={theme === t.id}
           title={`Tema ${t.label}`}

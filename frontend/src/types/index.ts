@@ -83,6 +83,7 @@ export interface SessionDTO {
   total_characters: number;
   wpm: number;
   accuracy: number;
+  new_achievements?: { id: string; name: string; description: string }[];
 }
 
 export interface OverviewStatsDTO {
@@ -210,3 +211,49 @@ export interface GamificationOverviewDTO {
   practice_seconds_today: number;
   achievements: AchievementDTO[];
 }
+
+export interface WpmTrendPointDTO {
+  date: string;
+  wpm: number;
+  accuracy: number;
+}
+
+export interface ErrorCharStatDTO {
+  char: string;
+  count: number;
+}
+
+export interface DailyStatSummaryDTO {
+  date: string;
+  sessions: number;
+  avg_wpm: number;
+  avg_accuracy?: number;
+}
+
+export interface SessionHistoryItemDTO {
+  id: string;
+  date: string;
+  text_title: string;
+  wpm: number;
+  accuracy: number;
+  errors: number;
+  duration_seconds: number;
+  xp_earned: number;
+}
+
+export interface SessionStatsSummaryDTO {
+  wpm_trend: WpmTrendPointDTO[];
+  error_chars: ErrorCharStatDTO[];
+  daily_summary: DailyStatSummaryDTO[];
+  recent_sessions: SessionHistoryItemDTO[];
+}
+
+export interface AchievementItemDTO {
+  id: string;
+  name: string;
+  description: string;
+  unlocked_at: string | null;
+  seen: boolean;
+}
+
+

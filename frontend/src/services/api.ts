@@ -1,5 +1,7 @@
 import { useAuthStore } from "@/stores/authStore";
 import type {
+  AchievementDTO,
+  AchievementItemDTO,
   AlignmentDTO,
   AlignmentLinkDTO,
   BlankDTO,
@@ -17,6 +19,7 @@ import type {
   RecallMode,
   RecallSessionDTO,
   SessionDTO,
+  SessionStatsSummaryDTO,
   TextDTO,
   TranslationMode,
   UserSettingsDTO,
@@ -32,6 +35,10 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 // firing another request -- keyed lowercase, module-scoped so it survives across
 // components/pages for the lifetime of the tab.
 const dictionaryCache = new Map<string, string | null>();
+
+export function clearDictionaryCache(): void {
+  dictionaryCache.clear();
+}
 
 export class ApiError extends Error {
   status: number;
@@ -74,6 +81,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     // Every page already redirects to /login once the store's token goes null
     // (each page's hasHydrated/token effect), so clearing it here is enough to get
     // the user off an indefinite loading screen instead of a full page reload.
+    clearDictionaryCache();
     const message = "Tu sesion expiro. Inicia sesion de nuevo.";
     useAuthStore.getState().logout(message);
     throw new ApiError(response.status, message);
@@ -115,7 +123,10 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
-  logout: () => request<void>("/auth/logout", { method: "POST" }),
+  logout: () => {
+    clearDictionaryCache();
+    return request<void>("/auth/logout", { method: "POST" });
+  },
 
   me: () => request<{ id: string; email: string }>("/auth/me"),
 
@@ -158,6 +169,16 @@ export const api = {
         duration_seconds: stats.duration_seconds,
         errors: stats.errors,
       }),
+    }),
+
+  getSessionStatsSummary: (days: number = 30) =>
+    request<SessionStatsSummaryDTO>(`/sessions/stats/summary?days=${days}`),
+
+  getAchievements: () => request<AchievementItemDTO[]>("/achievements"),
+
+  markAchievementsSeen: () =>
+    request<{ status: string; marked_count: number }>("/achievements/mark-seen", {
+      method: "POST",
     }),
 
   getOverview: () => request<OverviewStatsDTO>("/statistics/overview"),

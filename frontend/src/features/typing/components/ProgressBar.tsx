@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { memo } from 'react';
 
 interface ProgressBarProps {
   percent: number;
@@ -8,14 +8,18 @@ interface ProgressBarProps {
   remaining?: number;
 }
 
-export function ProgressBar({ percent, mode = 'progress', remaining = 0 }: ProgressBarProps) {
+export const ProgressBar = memo(function ProgressBar({
+  percent,
+  mode = 'progress',
+  remaining = 0,
+}: ProgressBarProps) {
   const clampedPercent = Math.min(Math.max(percent, 0), 100);
 
   return (
     <div className="fixed top-0 left-0 w-full h-[2px] bg-gray-800 z-50">
       <div 
-        className="h-full bg-gradient-to-r from-cyan-500 to-green-500 transition-all duration-150 ease-out"
-        style={{ width: `${clampedPercent}%` }}
+        className="h-full w-full bg-gradient-to-r from-cyan-500 to-green-500 transition-transform duration-150 ease-out will-change-transform origin-left"
+        style={{ transform: `scaleX(${clampedPercent / 100})` }}
       />
       {mode === 'countdown' && remaining > 0 && (
         <div className="absolute top-1 right-2 text-xs font-mono text-gray-500 opacity-70">
@@ -24,4 +28,4 @@ export function ProgressBar({ percent, mode = 'progress', remaining = 0 }: Progr
       )}
     </div>
   );
-}
+});

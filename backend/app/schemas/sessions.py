@@ -20,6 +20,7 @@ class SessionOut(BaseModel):
     total_characters: int
     wpm: float
     accuracy: float
+    new_achievements: list[dict] = Field(default_factory=list)
 
 
 # Mirrors the column widths in models/typing_session.py. Values are clipped rather
@@ -54,3 +55,44 @@ class SessionFinish(BaseModel):
     total_characters: int = Field(ge=0)
     duration_seconds: float = Field(ge=0)
     errors: list[ErrorIn] = Field(default_factory=list, max_length=MAX_ERRORS_PER_SESSION)
+
+
+class WpmTrendPoint(BaseModel):
+    date: str
+    wpm: float
+    accuracy: float
+
+
+class ErrorCharStat(BaseModel):
+    char: str
+    count: int
+
+
+class DailyStatSummary(BaseModel):
+    date: str
+    sessions: int
+    avg_wpm: float
+    avg_accuracy: float = 0.0
+
+
+class SessionHistoryItem(BaseModel):
+    id: str
+    date: str
+    text_title: str
+    wpm: float
+    accuracy: float
+    errors: int
+    duration_seconds: float
+    xp_earned: int
+
+
+class SessionStatsSummaryOut(BaseModel):
+    wpm_trend: list[WpmTrendPoint]
+    error_chars: list[ErrorCharStat]
+    daily_summary: list[DailyStatSummary]
+    recent_sessions: list[SessionHistoryItem]
+
+
+def stats_cache_key(user_id: uuid.UUID | str, days: int) -> str:
+    return f"cache:stats:{user_id}:{days}"
+

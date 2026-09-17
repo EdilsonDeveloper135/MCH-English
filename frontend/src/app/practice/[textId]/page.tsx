@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { useTypingStore } from "@/stores/typingStore";
 import { api } from "@/services/api";
-import type { ChunkDTO, TextDTO, TranslationMode } from "@/types";
+import type { ChunkDTO, PhraseDTO, TextDTO, TranslationMode } from "@/types";
 import type { Keystroke, PerKeyStats, SessionResult } from "@/types/typing";
 
 // Visual engine
@@ -21,6 +21,7 @@ import { SessionPanel } from "@/features/typing/components/SessionPanel";
 import { ZenModeExperience } from "@/features/typing/components/ZenModeExperience";
 import { SessionResults } from "@/features/typing/components/SessionResults";
 import { SessionReplay } from "@/features/typing/components/SessionReplay";
+import { AchievementToast, type UnlockedAchievement } from "@/features/gamification/AchievementToast";
 
 // Supporting learning components
 import { TypingCaptureInput } from "@/features/typing/TypingCaptureInput";
@@ -100,6 +101,7 @@ export default function PracticePage() {
   const [isReplaying, setIsReplaying] = useState(false);
   const [sessionCompletedResult, setSessionCompletedResult] = useState<SessionResult | null>(null);
   const [replayKeystrokes, setReplayKeystrokes] = useState<Keystroke[]>([]);
+  const [newAchievements, setNewAchievements] = useState<UnlockedAchievement[]>([]);
 
   const [translationMode, setTranslationMode] = useState<TranslationMode>("learning");
   const [lastCompletedSentenceId, setLastCompletedSentenceId] = useState<string | null>(null);
@@ -266,6 +268,10 @@ export default function PracticePage() {
       }
       setSaveError(null);
 
+      if (finished.new_achievements && finished.new_achievements.length > 0) {
+        setNewAchievements(finished.new_achievements);
+      }
+
       const errorWords = Array.from(
         new Set(
           stats.errors
@@ -408,16 +414,40 @@ export default function PracticePage() {
     setRevealedSentenceId(null);
   }, [chunk?.id, attempt]);
 
-  function handleModeChange(mode: TranslationMode) {
+  const handleModeChange = useCallback((mode: TranslationMode) => {
     setTranslationMode(mode);
     api.updateSettings({ translation_mode: mode }).catch(() => {});
-  }
+  }, []);
 
-  function updateSentenceInChunk(sentenceId: string, update: (s: ChunkDTO["sentences"][number]) => ChunkDTO["sentences"][number]) {
-    setChunk((prev) =>
-      prev ? { ...prev, sentences: prev.sentences.map((s) => (s.id === sentenceId ? update(s) : s)) } : prev
-    );
-  }
+  const updateSentenceInChunk = useCallback(
+    (sentenceId: string, update: (s: ChunkDTO["sentences"][number]) => ChunkDTO["sentences"][number]) => {
+      setChunk((prev) =>
+        prev ? { ...prev, sentences: prev.sentences.map((s) => (s.id === sentenceId ? update(s) : s)) } : prev
+      );
+    },
+    []
+  );
+
+  const handleGrammarNoteSaved = useCallback(
+    (sId: string, note: string | null) => {
+      updateSentenceInChunk(sId, (s) => ({ ...s, grammar_note: note }));
+    },
+    [updateSentenceInChunk]
+  );
+
+  const handlePhraseAdded = useCallback(
+    (sId: string, phrase: PhraseDTO) => {
+      updateSentenceInChunk(sId, (s) => ({ ...s, phrases: [...s.phrases, phrase] }));
+    },
+    [updateSentenceInChunk]
+  );
+
+  const handlePhraseDeleted = useCallback(
+    (sId: string, pId: string) => {
+      updateSentenceInChunk(sId, (s) => ({ ...s, phrases: s.phrases.filter((p) => p.id !== pId) }));
+    },
+    [updateSentenceInChunk]
+  );
 
   const retryCurrentChunk = useCallback(() => {
     if (text && chunk) loadChunk(text, chunk.index);
@@ -429,6 +459,30 @@ export default function PracticePage() {
     },
     [text, loadChunk]
   );
+  const progressPercent = targetText.length ? (currentIndex / targetText.length) * 100 : 0;
+  const isComplete = targetText.length > 0 && currentIndex >= targetText.length;
+  const elapsedSeconds = sessionStartTimeRef.current
+    ? (Date.now() - sessionStartTimeRef.current - pausedTime) / 1000
+    : 0;
+
+  const currentSentenceId = findSentenceIdAt(sentenceRanges, currentIndex);
+  const targetSentenceId =
+    translationMode === "assisted" ? currentSentenceId ?? lastCompletedSentenceId : lastCompletedSentenceId;
+  const targetSentence = chunk?.sentences.find((s) => s.id === targetSentenceId) ?? null;
+  const isRevealed = targetSentenceId !== null && targetSentenceId === revealedSentenceId;
+  const hasNextChunk = Boolean(text && chunk && chunk.index + 1 < text.chunk_count);
+
+  const handleRevealSentence = useCallback(() => {
+    if (targetSentenceId) setRevealedSentenceId(targetSentenceId);
+  }, [targetSentenceId]);
+
+  const incorrectErrorCount = useMemo(() => {
+    let count = 0;
+    for (let i = 0; i < charStates.length; i++) {
+      if (charStates[i] === "incorrect") count++;
+    }
+    return count;
+  }, [charStates]);
 
   if (loadState === "loading") return <CenteredMessage text="Cargando texto de práctica..." />;
   if (loadState === "processing") return <CenteredMessage text="Procesando oraciones y alineación..." />;
@@ -472,19 +526,6 @@ export default function PracticePage() {
     );
   }
 
-  const progressPercent = targetText.length ? (currentIndex / targetText.length) * 100 : 0;
-  const isComplete = targetText.length > 0 && currentIndex >= targetText.length;
-  const elapsedSeconds = sessionStartTimeRef.current
-    ? (Date.now() - sessionStartTimeRef.current - pausedTime) / 1000
-    : 0;
-
-  const currentSentenceId = findSentenceIdAt(sentenceRanges, currentIndex);
-  const targetSentenceId =
-    translationMode === "assisted" ? currentSentenceId ?? lastCompletedSentenceId : lastCompletedSentenceId;
-  const targetSentence = chunk?.sentences.find((s) => s.id === targetSentenceId) ?? null;
-  const isRevealed = targetSentenceId !== null && targetSentenceId === revealedSentenceId;
-  const hasNextChunk = Boolean(text && chunk && chunk.index + 1 < text.chunk_count);
-
   if (zenMode) {
     return (
       <>
@@ -513,6 +554,7 @@ export default function PracticePage() {
   if (sessionCompletedResult) {
     return (
       <div className="min-h-screen px-6 py-12 flex flex-col justify-center">
+        <AchievementToast achievements={newAchievements} onDismiss={() => setNewAchievements([])} />
         <SessionResults
           result={sessionCompletedResult}
           onAgain={retryCurrentChunk}
@@ -572,7 +614,7 @@ export default function PracticePage() {
           <LiveStats
             wpm={liveWpm}
             accuracy={liveAccuracy}
-            errors={charStates.filter((s) => s === "incorrect").length}
+            errors={incorrectErrorCount}
             elapsedSeconds={Math.max(0, Math.round(elapsedSeconds))}
             progressPercent={progressPercent}
             isFocused={isFocused}
@@ -632,15 +674,15 @@ export default function PracticePage() {
             translation={targetSentence?.translation ?? null}
             mode={translationMode}
             revealed={isRevealed}
-            onReveal={() => targetSentenceId && setRevealedSentenceId(targetSentenceId)}
+            onReveal={handleRevealSentence}
           />
           {targetSentence && (
             <SentenceInfoPanel
               textId={textId}
               sentence={targetSentence}
-              onGrammarNoteSaved={(sId, note) => updateSentenceInChunk(sId, (s) => ({ ...s, grammar_note: note }))}
-              onPhraseAdded={(sId, phrase) => updateSentenceInChunk(sId, (s) => ({ ...s, phrases: [...s.phrases, phrase] }))}
-              onPhraseDeleted={(sId, pId) => updateSentenceInChunk(sId, (s) => ({ ...s, phrases: s.phrases.filter((p) => p.id !== pId) }))}
+              onGrammarNoteSaved={handleGrammarNoteSaved}
+              onPhraseAdded={handlePhraseAdded}
+              onPhraseDeleted={handlePhraseDeleted}
             />
           )}
         </div>
@@ -668,6 +710,7 @@ export default function PracticePage() {
       />
 
       <SessionPanel isOpen={isSessionPanelOpen} onClose={() => setIsSessionPanelOpen(false)} />
+      <AchievementToast achievements={newAchievements} onDismiss={() => setNewAchievements([])} />
     </div>
   );
 }

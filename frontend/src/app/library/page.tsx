@@ -1,11 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { api } from "@/services/api";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import type { AlignmentStatus, ChunkMode, TextDTO } from "@/types";
+
+const ImporterModal = dynamic(
+  () => import("@/features/import/ImporterModal").then((m) => m.ImporterModal),
+  { ssr: false }
+);
 
 const ALIGNMENT_LABEL: Record<AlignmentStatus, string> = {
   not_provided: "",
@@ -30,16 +36,31 @@ export default function LibraryPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [translation, setTranslation] = useState("");
-  const [chunkMode, setChunkMode] = useState<ChunkMode>("normal");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const data = await api.listTexts();
     setTexts(data);
     return data;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("import") === "quicktype") {
+      try {
+        const raw = sessionStorage.getItem("quicktype_save_text");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.title) setTitle(parsed.title);
+          if (parsed.content) setContent(parsed.content);
+          setShowCreateModal(true);
+          sessionStorage.removeItem("quicktype_save_text");
+        }
+      } catch {
+        // ignore parse error
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -59,33 +80,6 @@ export default function LibraryPage() {
     const timer = setInterval(() => refresh().catch(() => {}), 2000);
     return () => clearInterval(timer);
   }, [texts, refresh]);
-
-  useEffect(() => {
-    if (!showCreateModal) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setShowCreateModal(false);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showCreateModal]);
-
-  async function handleCreate(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      await api.createText(title.trim() || "Texto sin titulo", content, chunkMode, translation.trim());
-      setTitle("");
-      setContent("");
-      setTranslation("");
-      setShowCreateModal(false);
-      await refresh();
-    } catch {
-      setError("No se pudo guardar el texto.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   async function confirmDelete() {
     if (!deletingId) return;
@@ -194,112 +188,21 @@ export default function LibraryPage() {
         </ul>
       )}
 
-      {/* Accessible Creation Modal */}
-      {showCreateModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-text-title"
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
-        >
-          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl my-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 id="create-text-title" className="text-lg font-bold text-white">
-                Agregar Nuevo Texto
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                aria-label="Cerrar modal"
-                className="text-neutral-400 hover:text-white text-lg p-1 rounded focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div>
-                <label htmlFor="text-title" className="block text-xs text-neutral-400 mb-1">
-                  Título
-                </label>
-                <input
-                  id="text-title"
-                  placeholder="ej: Alice in Wonderland - Chapter 1"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="text-content" className="block text-xs text-neutral-400 mb-1">
-                  Texto en inglés <span className="text-red-400">*</span>
-                </label>
-                <textarea
-                  id="text-content"
-                  required
-                  placeholder="Pega aquí el texto en inglés..."
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  rows={5}
-                  className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none font-mono"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="text-translation" className="block text-xs text-neutral-400 mb-1">
-                  Traducción al español <span className="text-neutral-500">(opcional)</span>
-                </label>
-                <textarea
-                  id="text-translation"
-                  placeholder="Traducción humana al español para referencia exacta (sin IA)..."
-                  value={translation}
-                  onChange={(e) => setTranslation(e.target.value)}
-                  rows={4}
-                  className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none font-mono"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="chunk-mode" className="block text-xs text-neutral-400 mb-1">
-                  Modo de división
-                </label>
-                <select
-                  id="chunk-mode"
-                  value={chunkMode}
-                  onChange={(e) => setChunkMode(e.target.value as ChunkMode)}
-                  className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-white text-sm focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
-                >
-                  {CHUNK_MODES.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {error && <p className="text-red-400 text-xs">{error}</p>}
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-neutral-800">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-xs text-neutral-400 hover:text-white rounded-xl focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="bg-white hover:bg-neutral-200 text-black rounded-xl px-5 py-2 text-xs font-semibold disabled:opacity-50 transition-colors focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
-                >
-                  {submitting ? "Guardando..." : "Guardar texto"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Advanced Client-Side Importer Modal (Paste, PDF, ePub) */}
+      <ImporterModal
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+          setTitle("");
+          setContent("");
+        }}
+        onCreated={async (newText) => {
+          setTexts((prev) => [newText, ...prev]);
+          await refresh();
+        }}
+        initialTitle={title}
+        initialContent={content}
+      />
 
       <ConfirmModal
         open={deletingId !== null}

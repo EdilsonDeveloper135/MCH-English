@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { TranslationMode } from "@/types";
 
 interface TranslationPanelProps {
@@ -9,7 +10,12 @@ interface TranslationPanelProps {
   onReveal: () => void;
 }
 
-export function TranslationPanel({ translation, mode, revealed, onReveal }: TranslationPanelProps) {
+export const TranslationPanel = memo(function TranslationPanel({
+  translation,
+  mode,
+  revealed,
+  onReveal,
+}: TranslationPanelProps) {
   if (!translation) return null;
 
   if (mode === "learning" || revealed) {
@@ -21,4 +27,4 @@ export function TranslationPanel({ translation, mode, revealed, onReveal }: Tran
       Ver traduccion
     </button>
   );
-}
+});

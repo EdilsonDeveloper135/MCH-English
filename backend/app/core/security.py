@@ -66,18 +66,25 @@ def remaining_seconds(token: str) -> int:
 
 
 _redis_client: aioredis.Redis | None = None
+_redis_url: str | None = None
 
 
-def _get_redis() -> aioredis.Redis:
-    # An async client, because this runs inside the request path of every
-    # authenticated endpoint -- a blocking client would stall the whole event loop
-    # for as long as Redis takes to answer.
-    global _redis_client
-    if _redis_client is None:
+def get_redis_client() -> aioredis.Redis:
+    # An async client with a bounded connection pool (max 50 connections) to prevent
+    # file descriptor exhaustion and connection starvation under concurrent requests.
+    global _redis_client, _redis_url
+    if _redis_client is None or _redis_url != settings.redis_url:
+        _redis_url = settings.redis_url
         _redis_client = aioredis.from_url(
-            settings.redis_url, socket_timeout=1.0, socket_connect_timeout=1.0
+            settings.redis_url,
+            socket_timeout=1.0,
+            socket_connect_timeout=1.0,
+            max_connections=50,
         )
     return _redis_client
+
+
+_get_redis = get_redis_client
 
 
 def _blacklist_key(token: str) -> str:

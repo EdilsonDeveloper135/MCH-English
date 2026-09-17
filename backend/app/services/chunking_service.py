@@ -20,7 +20,11 @@ _ABBREVIATIONS = {
 
 # Splits right after sentence-ending punctuation, only when followed by whitespace and
 # then a capital letter, digit or quote (a reasonable heuristic for "new sentence starts here").
-_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'])")
+# Supports ASCII and Unicode ellipsis (…) and closing quotes (", ”, ').
+_SENTENCE_SPLIT_RE = re.compile(
+    r'(?<=[.!?…])\s+(?=[A-Z0-9"\u201c\'])|(?<=[.!?…]["\u201d\'])\s+(?=[A-Z0-9"\u201c\'])',
+    re.UNICODE,
+)
 _WORD_RE = re.compile(r"[\w'’]+(?:-[\w'’]+)*", re.UNICODE)
 
 

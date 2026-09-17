@@ -7,9 +7,13 @@ import { useAuthStore } from "@/stores/authStore";
 import { useTypingStore } from "@/stores/typingStore";
 import { useApplyTheme } from "@/features/typing/ZenToggle";
 import { api } from "@/services/api";
+import { AchievementsBadge } from "@/components/AchievementsBadge";
+import { ShortcutsHelpModal } from "@/components/ShortcutsHelpModal";
+import { useGlobalHotkeys } from "@/hooks/useGlobalHotkeys";
 
 const NAV_LINKS = [
   { href: "/library", label: "Library" },
+  { href: "/quicktype", label: "QuickType" },
   { href: "/vocabulary", label: "Vocabulary" },
   { href: "/progress", label: "Progress" },
   { href: "/gamification", label: "Gamification" },
@@ -25,18 +29,18 @@ export function AppHeader() {
   const logout = useAuthStore((s) => s.logout);
   const isFocusMode = useTypingStore((s) => s.isFocusMode);
   const [isOpen, setIsOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   // Mounted on every page, so this is where the saved theme gets applied.
   useApplyTheme();
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsOpen(false);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
+  useGlobalHotkeys({
+    onToggleHelp: () => setIsHelpOpen((prev) => !prev),
+    onEscape: () => {
+      setIsOpen(false);
+      setIsHelpOpen(false);
+    },
+  });
 
   if (!token || HIDDEN_PATHS.includes(pathname)) return null;
 
@@ -50,7 +54,7 @@ export function AppHeader() {
         <div className="flex items-center justify-between">
           <Link
             href="/library"
-            className="text-sm text-gray-400 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none rounded px-2 py-1 inline-block"
+            className="text-sm text-gray-400 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none rounded px-2 py-1 inline-flex items-center gap-1 truncate max-w-[85vw] sm:max-w-none"
           >
             ← Salir / Volver a Biblioteca
           </Link>
@@ -87,10 +91,12 @@ export function AppHeader() {
         <nav className="hidden md:flex items-center gap-4 text-gray-400" aria-label="Navegación principal">
           {NAV_LINKS.map((link) => {
             const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+            const isSecondary = link.href === "/settings" || link.href === "/gamification" || link.href === "/vocabulary" || link.href === "/progress";
             return (
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={!isSecondary}
                 aria-current={active ? "page" : undefined}
                 className={`transition-colors ${
                   active ? "text-white font-medium" : "hover:text-white"
@@ -100,6 +106,7 @@ export function AppHeader() {
               </Link>
             );
           })}
+          <AchievementsBadge />
           {/* A hint, not a control: the palette opens with the keyboard shortcut. */}
           <span className="text-gray-600 font-mono text-xs border border-gray-800 rounded px-1.5 py-0.5" title="Paleta de comandos (⌘K / Ctrl+K)">
             ⌘K
@@ -166,6 +173,7 @@ export function AppHeader() {
           </div>
         )}
       </div>
+      <ShortcutsHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
     </header>
   );
 }

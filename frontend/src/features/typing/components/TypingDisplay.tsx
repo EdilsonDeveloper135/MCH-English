@@ -10,6 +10,8 @@ interface TypingDisplayProps {
   currentIndex: number;
   extraChars?: Record<number, string[]>;
   hidePending?: boolean;
+  isChunkCompleting?: boolean;
+  showStreakFlash?: boolean;
 }
 
 interface BlockProps {
@@ -102,30 +104,29 @@ const WordBlock = memo(function WordBlock({
     const char = word[i];
     const isCurrentChar = absoluteIndex === currentIndex;
 
-    let charStyle: React.CSSProperties = {
-      transition: reduceMotion ? 'none' : 'color 150ms ease, opacity 150ms ease',
-    };
-    let charClass = 'inline-block';
+    let charStyle: React.CSSProperties = {};
+    if (reduceMotion) {
+      charStyle.transition = 'none';
+    }
+    let charClass = 'inline-block char-transition';
 
     if (status === 'pending') {
       if (hidePending && !isCurrentChar) {
         charStyle.opacity = 0;
       } else {
         charStyle.color = 'var(--char-pending)';
-        if (isCurrentChar) {
-          charStyle.opacity = 1;
-        } else {
-          const distance = absoluteIndex - currentIndex;
-          charStyle.opacity = (distance > 0 && distance < 50) ? 0.7 : 0.4;
-        }
+        charStyle.opacity = isCurrentChar ? 1 : 0.8;
       }
     } else if (status === 'correct') {
       charStyle.color = 'var(--char-correct)';
+      if (!reduceMotion) {
+        charClass += ' char-correct-anim';
+      }
     } else if (status === 'incorrect') {
       charStyle.color = 'var(--char-incorrect)';
       charStyle.backgroundColor = 'rgba(var(--char-incorrect-rgb, 239, 68, 68), 0.15)';
-      if (!reduceMotion && isCurrentChar) {
-        charClass += ' animate-shake';
+      if (!reduceMotion) {
+        charClass += ' char-incorrect-anim';
       }
     }
 
@@ -156,11 +157,11 @@ const WordBlock = memo(function WordBlock({
 
   return (
     <span 
-      className="inline-block whitespace-pre-wrap transition-all duration-150"
+      className="inline-block whitespace-pre-wrap transition-opacity duration-150"
       style={{
         opacity: wordOpacity,
         fontWeight: wordWeight,
-        transform: `scale(${wordScale})`,
+        transform: wordScale !== 1 ? `scale(${wordScale})` : undefined,
       }}
     >
       {chars}
@@ -173,13 +174,16 @@ export function TypingDisplay({
   charStates,
   currentIndex,
   extraChars,
-  hidePending
+  hidePending,
+  isChunkCompleting = false,
+  showStreakFlash = false,
 }: TypingDisplayProps) {
   const preferences = useTypingStore((s) => s.preferences);
   const { fontSize, reduceMotion, readAhead, lineHeight, lineWidth } = preferences;
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [scrollY, setScrollY] = useState(0);
+  const [isChunkEntering, setIsChunkEntering] = useState(true);
 
   const blocks = useMemo(() => {
     const regex = /\S+|\s+/g;
@@ -202,31 +206,37 @@ export function TypingDisplay({
   // leave the next chunk scrolled out of the visible window.
   useEffect(() => {
     setScrollY(0);
+    setIsChunkEntering(true);
+    const timer = setTimeout(() => setIsChunkEntering(false), 300);
+    return () => clearTimeout(timer);
   }, [targetText]);
 
   useEffect(() => {
     if (!containerRef.current || !contentRef.current) return;
 
-    const currentCharEl = contentRef.current.querySelector(`[data-char-index="${currentIndex}"]`) as HTMLElement;
-    if (currentCharEl) {
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const charRect = currentCharEl.getBoundingClientRect();
+    let rafId: number;
+    rafId = requestAnimationFrame(() => {
+      if (!containerRef.current || !contentRef.current) return;
+      const currentCharEl = contentRef.current.querySelector(`[data-char-index="${currentIndex}"]`) as HTMLElement;
+      if (currentCharEl) {
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const charRect = currentCharEl.getBoundingClientRect();
 
-      const charTopRelativeToContainer = charRect.top - containerRect.top;
+        const charTopRelativeToContainer = charRect.top - containerRect.top;
 
-      const targetOffset = 40;
-      if (charTopRelativeToContainer > targetOffset + 30) {
-        setScrollY(prev => prev + (charTopRelativeToContainer - targetOffset));
+        const targetOffset = 40;
+        if (charTopRelativeToContainer > targetOffset + 30) {
+          setScrollY((prev) => prev + (charTopRelativeToContainer - targetOffset));
+        }
       }
-    }
+    });
+
+    return () => cancelAnimationFrame(rafId);
   }, [currentIndex]);
 
   const displayStyle: React.CSSProperties = {
     fontSize: fontSize ? `${fontSize}px` : '24px',
     lineHeight: lineHeight || '1.5',
-    // `ch`, not `px`: lineWidth is a measure in characters (that is how the Settings
-    // screen presents and previews it). As pixels it rendered the whole exercise in an
-    // 80px-wide strip.
     maxWidth: lineWidth ? `${lineWidth}ch` : '65ch',
   };
 
@@ -238,13 +248,17 @@ export function TypingDisplay({
   return (
     <div
       ref={containerRef}
-      className="relative overflow-hidden h-[220px] w-full mx-auto"
+      className={`relative overflow-hidden h-[220px] w-full mx-auto rounded-xl border border-transparent transition-all duration-200 ${
+        showStreakFlash && !reduceMotion ? 'streak-flash-active' : ''
+      }`}
       style={displayStyle}
     >
       <div 
         ref={contentRef}
         style={scrollStyle}
-        className="will-change-transform"
+        className={`will-change-transform ${isChunkEntering && !reduceMotion ? 'chunk-anim-in' : ''} ${
+          isChunkCompleting && !reduceMotion ? 'chunk-anim-out' : ''
+        }`}
       >
         {blocks.map((block, i) => (
           <WordBlock

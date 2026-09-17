@@ -24,12 +24,27 @@ export function ZenModeExperience({
 }: ZenModeExperienceProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isComplete = targetText.length > 0 && currentIndex >= targetText.length;
+  const progressPercent = targetText.length > 0 ? Math.min(100, (currentIndex / targetText.length) * 100) : 0;
 
   return (
     <div
       ref={containerRef}
       className="fixed inset-0 z-50 flex flex-col items-center justify-center px-8 bg-[var(--bg-primary)] transition-colors duration-300 select-none cursor-text"
     >
+      {/* Subtle Vertical Progress Bar on Left Margin */}
+      <div
+        className="fixed left-0 top-0 bottom-0 w-1 bg-neutral-900/60 z-50 pointer-events-none"
+        role="progressbar"
+        aria-valuenow={Math.round(progressPercent)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Progreso del fragmento en modo Zen"
+      >
+        <div
+          className="w-full bg-[var(--accent,#22d3ee)] transition-[height] duration-150 ease-out opacity-75 shadow-[0_0_8px_var(--accent,#22d3ee)]"
+          style={{ height: `${progressPercent}%` }}
+        />
+      </div>
       {/* Subtle Exit Trigger Button */}
       <button
         type="button"

@@ -19,7 +19,7 @@ describe("TypingText", () => {
 
     expect(screen.getByText("a")).toHaveClass("text-white");
     expect(screen.getByText("b")).toHaveClass("text-red-500");
-    expect(screen.getByText("c")).toHaveClass("text-gray-400");
+    expect(screen.getByText("c")).toHaveClass("text-neutral-300");
   });
 
   it("marks the current cursor position with the cyan border", () => {
@@ -47,7 +47,7 @@ describe("TypingText", () => {
     expect(screen.getByText("H")).toHaveClass("text-white");
     expect(screen.getByText("i")).toHaveClass("text-white");
     expect(screen.getByText("c")).toHaveClass("text-red-500");
-    expect(screen.getByText("a")).toHaveClass("text-gray-400");
+    expect(screen.getByText("a")).toHaveClass("text-neutral-300");
     expect(screen.getByText("a")).toHaveClass("border-cyan-400");
   });
 });

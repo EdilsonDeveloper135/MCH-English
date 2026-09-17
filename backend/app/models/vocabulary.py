@@ -17,6 +17,7 @@ class VocabularyItem(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "word", name="uq_vocabulary_items_user_word"),
         Index("ix_vocabulary_items_user_mastery", "user_id", "mastery_score"),
+        Index("idx_user_vocab_user_last_seen", "user_id", "last_seen"),
     )
 
 

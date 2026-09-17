@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.text import Sentence
+from app.models.text import Sentence, Text
 from app.models.typing_session import TypingError, TypingSession
 
 
@@ -175,3 +175,105 @@ async def history_for_user(db: AsyncSession, user_id: uuid.UUID, days: int | Non
         }
         for bucket_day, avg_wpm, avg_accuracy, practice_seconds in result.all()
     ]
+
+
+async def stats_summary_for_user(db: AsyncSession, user_id: uuid.UUID, days: int = 30) -> dict:
+    """Returns trend of recent sessions, top error characters, daily summaries, and recent session history."""
+    # 1. WPM Trend: up to last 30 finished sessions
+    trend_result = await db.execute(
+        select(TypingSession.finished_at, TypingSession.wpm, TypingSession.accuracy)
+        .where(TypingSession.user_id == user_id, TypingSession.finished_at.is_not(None))
+        .order_by(TypingSession.finished_at.desc())
+        .limit(30)
+    )
+    trend_rows = list(reversed(trend_result.all()))
+    wpm_trend = [
+        {
+            "date": r[0].strftime("%d/%m %H:%M") if r[0] else "",
+            "wpm": round(float(r[1]), 1),
+            "accuracy": round(float(r[2]), 1),
+        }
+        for r in trend_rows
+    ]
+
+    # 2. Error characters: top 10 most common error expected characters
+    error_result = await db.execute(
+        select(TypingError.expected_char, func.count(TypingError.id))
+        .join(TypingSession, TypingError.session_id == TypingSession.id)
+        .where(TypingSession.user_id == user_id)
+        .group_by(TypingError.expected_char)
+        .order_by(func.count(TypingError.id).desc())
+        .limit(10)
+    )
+    error_chars = [
+        {"char": char, "count": int(count)}
+        for char, count in error_result.all()
+    ]
+
+    # 3. Daily Summary for heatmap
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    day_col = func.date_trunc("day", TypingSession.finished_at)
+    daily_result = await db.execute(
+        select(
+            day_col.label("day"),
+            func.count(TypingSession.id),
+            func.coalesce(func.avg(TypingSession.wpm), 0),
+            func.coalesce(func.avg(TypingSession.accuracy), 0),
+        )
+        .where(
+            TypingSession.user_id == user_id,
+            TypingSession.finished_at.is_not(None),
+            TypingSession.finished_at >= cutoff,
+        )
+        .group_by(day_col)
+        .order_by(day_col)
+    )
+    daily_summary = [
+        {
+            "date": d.date().isoformat(),
+            "sessions": int(cnt),
+            "avg_wpm": round(float(avg_w), 1),
+            "avg_accuracy": round(float(avg_acc), 1),
+        }
+        for d, cnt, avg_w, avg_acc in daily_result.all()
+    ]
+
+    # 4. Recent 50 sessions with text title for table and CSV export
+    sessions_query = (
+        select(
+            TypingSession.id,
+            TypingSession.finished_at,
+            TypingSession.wpm,
+            TypingSession.accuracy,
+            TypingSession.incorrect_characters,
+            TypingSession.duration_seconds,
+            TypingSession.correct_characters,
+            func.coalesce(Text.title, "Palabras Débiles").label("text_title"),
+        )
+        .outerjoin(Text, TypingSession.text_id == Text.id)
+        .where(TypingSession.user_id == user_id, TypingSession.finished_at.is_not(None))
+        .order_by(TypingSession.finished_at.desc())
+        .limit(50)
+    )
+    recent_rows = (await db.execute(sessions_query)).all()
+    recent_sessions = [
+        {
+            "id": str(r[0]),
+            "date": r[1].strftime("%Y-%m-%d %H:%M") if r[1] else "",
+            "text_title": r[7],
+            "wpm": round(float(r[2]), 1),
+            "accuracy": round(float(r[3]), 1),
+            "errors": int(r[4]),
+            "duration_seconds": round(float(r[5]), 1),
+            "xp_earned": int(r[6]),
+        }
+        for r in recent_rows
+    ]
+
+    return {
+        "wpm_trend": wpm_trend,
+        "error_chars": error_chars,
+        "daily_summary": daily_summary,
+        "recent_sessions": recent_sessions,
+    }
+

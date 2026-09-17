@@ -27,33 +27,37 @@ export function SmoothCaret({ containerRef, currentIndex, isComplete }: SmoothCa
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(() => setIsBlinking(true), 500);
 
-    const charEl = container.querySelector<HTMLElement>(`[data-char-index="${currentIndex}"]`);
-    if (charEl) {
-      const parentRect = container.getBoundingClientRect();
-      const charRect = charEl.getBoundingClientRect();
-      setPos({
-        left: charRect.left - parentRect.left,
-        top: charRect.top - parentRect.top,
-        height: charRect.height || 26,
-      });
-      if (typeof charEl.scrollIntoView === "function") {
-        charEl.scrollIntoView({ block: "nearest", inline: "nearest" });
-      }
-    } else {
-      // If past the last char, place at the end of the last character
-      const lastCharEl = container.querySelector<HTMLElement>(`[data-char-index="${currentIndex - 1}"]`);
-      if (lastCharEl) {
+    let rafId: number;
+    rafId = requestAnimationFrame(() => {
+      const charEl = container.querySelector<HTMLElement>(`[data-char-index="${currentIndex}"]`);
+      if (charEl) {
         const parentRect = container.getBoundingClientRect();
-        const charRect = lastCharEl.getBoundingClientRect();
+        const charRect = charEl.getBoundingClientRect();
         setPos({
-          left: charRect.right - parentRect.left,
+          left: charRect.left - parentRect.left,
           top: charRect.top - parentRect.top,
           height: charRect.height || 26,
         });
+        if (typeof charEl.scrollIntoView === "function") {
+          charEl.scrollIntoView({ block: "nearest", inline: "nearest" });
+        }
+      } else {
+        // If past the last char, place at the end of the last character
+        const lastCharEl = container.querySelector<HTMLElement>(`[data-char-index="${currentIndex - 1}"]`);
+        if (lastCharEl) {
+          const parentRect = container.getBoundingClientRect();
+          const charRect = lastCharEl.getBoundingClientRect();
+          setPos({
+            left: charRect.right - parentRect.left,
+            top: charRect.top - parentRect.top,
+            height: charRect.height || 26,
+          });
+        }
       }
-    }
+    });
 
     return () => {
+      cancelAnimationFrame(rafId);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
   }, [containerRef, currentIndex, isComplete]);

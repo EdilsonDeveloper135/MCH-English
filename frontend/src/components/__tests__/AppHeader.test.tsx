@@ -14,6 +14,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/services/api", () => ({
   api: {
     logout: vi.fn().mockResolvedValue(undefined),
+    getAchievements: vi.fn().mockResolvedValue([]),
   },
 }));
 

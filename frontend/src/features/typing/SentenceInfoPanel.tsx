@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { api } from "@/services/api";
 import type { PhraseDTO, SentenceDTO } from "@/types";
 
@@ -12,7 +12,7 @@ interface SentenceInfoPanelProps {
   onPhraseDeleted: (sentenceId: string, phraseId: string) => void;
 }
 
-export function SentenceInfoPanel({
+export const SentenceInfoPanel = memo(function SentenceInfoPanel({
   textId,
   sentence,
   onGrammarNoteSaved,
@@ -192,4 +192,4 @@ export function SentenceInfoPanel({
       )}
     </div>
   );
-}
+});

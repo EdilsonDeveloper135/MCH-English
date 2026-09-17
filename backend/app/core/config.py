@@ -14,12 +14,15 @@ _PLACEHOLDER_SECRETS = {
     "secret",
     "supersecret",
     "your-secret-key",
+    "dev-secret-key-change-in-production",
+    "dev-secret",
+    "development",
 }
 MIN_SECRET_KEY_LENGTH = 32
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
+    model_config = SettingsConfigDict(env_file=(".env", "../.env"), case_sensitive=False, extra="ignore")
 
     database_url: str
     redis_url: str

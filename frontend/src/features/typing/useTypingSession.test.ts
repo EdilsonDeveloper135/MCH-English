@@ -257,6 +257,48 @@ describe("useTypingSession", () => {
     expect(result.current.currentIndex).toBe(0);
     expect(result.current.charStates[0]).toBe("pending");
   });
+
+  it("handleInput handles deleteWordBackward by deleting the current word atomically", () => {
+    const { result } = renderHook(() => useTypingSession({ targetText: "the cat and dog", sentenceRanges: [] }));
+
+    const input = { value: "" };
+    const makeEvent = (inputType: string, data: string | null = null) => ({
+      currentTarget: input,
+      nativeEvent: { inputType, data } as unknown as InputEvent,
+    }) as unknown as FormEvent<HTMLInputElement>;
+
+    for (const ch of "the cat") {
+      act(() => result.current.handleInput(makeEvent("insertText", ch)));
+    }
+    expect(result.current.currentIndex).toBe(7);
+
+    act(() => result.current.handleInput(makeEvent("deleteWordBackward")));
+    // Deletes "cat" and jumps to start of word (index 4)
+    expect(result.current.currentIndex).toBe(4);
+    expect(result.current.charStates[4]).toBe("pending");
+  });
+
+  it("computes Net WPM ignoring mistyped characters", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2024, 0, 1, 0, 0, 0));
+      const { result } = renderHook(() => useTypingSession({ targetText: "Hello world", sentenceRanges: [] }));
+
+      // Type 5 correct ("Hello") and 5 incorrect ("xxxxx")
+      for (const ch of "Hello") {
+        act(() => result.current.handleKeyDown(keyEvent(ch)));
+      }
+      for (let i = 0; i < 5; i++) {
+        act(() => result.current.handleKeyDown(keyEvent("x")));
+      }
+      act(() => vi.advanceTimersByTime(30_000));
+
+      // Net WPM: 5 correct chars / 5 = 1 word / 0.5 min = 2 WPM (not 4 WPM from 10 total)
+      expect(result.current.liveWpm).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("useTypingSession keyboard shortcuts", () => {

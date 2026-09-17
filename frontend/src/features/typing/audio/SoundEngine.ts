@@ -24,8 +24,11 @@ class SoundEngine {
     this.volume = Math.max(0, Math.min(1, volume));
   }
 
+  private activeNodes = 0;
+  private readonly MAX_ACTIVE_NODES = 16;
+
   private playTone(type: OscillatorType, freq1: number, freq2: number | null, durationMs: number, baseGain: number, startTimeOffset = 0) {
-    if (!this.ctx) return;
+    if (!this.ctx || this.activeNodes >= this.MAX_ACTIVE_NODES) return;
     try {
       const t = this.ctx.currentTime + startTimeOffset;
       const osc = this.ctx.createOscillator();
@@ -44,6 +47,15 @@ class SoundEngine {
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
+
+      this.activeNodes++;
+      osc.onended = () => {
+        try {
+          osc.disconnect();
+          gain.disconnect();
+        } catch {}
+        this.activeNodes = Math.max(0, this.activeNodes - 1);
+      };
 
       osc.start(t);
       osc.stop(t + durationMs / 1000);

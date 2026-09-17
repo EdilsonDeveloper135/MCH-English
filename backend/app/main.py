@@ -1,7 +1,7 @@
+import re
 import time
 import uuid
 
-import redis.asyncio as aioredis
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -12,10 +12,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api import auth, dictation, dictionary, gamification, recall, sessions, settings, statistics, texts, vocabulary
+from app.api import achievements, auth, dictation, dictionary, gamification, recall, sessions, settings, statistics, texts, vocabulary
 from app.core.config import settings as app_settings
 from app.core.database import get_db
 from app.core.limiter import limiter
+from app.core.security import get_redis_client
 
 structlog.configure(
     processors=[
@@ -32,13 +33,22 @@ logger = structlog.get_logger()
 _UNLOGGED_PATHS = {"/health"}
 
 
+_REQUEST_ID_CLEAN_RE = re.compile(r"[^a-zA-Z0-9_\-]")
+
+
 class RequestContextMiddleware(BaseHTTPMiddleware):
     """Binds a request ID (the client's own X-Request-ID if it sent one, otherwise a
     fresh one) to every structlog call made while handling this request, echoes it
     back in the response header, and emits one structured JSON log line per request."""
 
     async def dispatch(self, request: Request, call_next):
-        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        raw_id = request.headers.get("X-Request-ID")
+        if raw_id:
+            cleaned = _REQUEST_ID_CLEAN_RE.sub("", raw_id)[:64]
+            request_id = cleaned if cleaned else str(uuid.uuid4())
+        else:
+            request_id = str(uuid.uuid4())
+
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(request_id=request_id)
 
@@ -81,6 +91,7 @@ app.include_router(recall.router, prefix="/recall", tags=["recall"])
 app.include_router(dictation.router, prefix="/dictation", tags=["dictation"])
 app.include_router(settings.router, prefix="/settings", tags=["settings"])
 app.include_router(gamification.router, prefix="/gamification", tags=["gamification"])
+app.include_router(achievements.router, prefix="/achievements", tags=["achievements"])
 
 
 @app.get("/health")
@@ -94,12 +105,9 @@ async def health(db: AsyncSession = Depends(get_db)):
         pass
 
     try:
-        redis_client = aioredis.from_url(app_settings.redis_url, socket_timeout=3.0)
-        try:
-            await redis_client.ping()
-            checks["redis"] = True
-        finally:
-            await redis_client.aclose()
+        redis_client = get_redis_client()
+        await redis_client.ping()
+        checks["redis"] = True
     except Exception:  # noqa: BLE001
         pass
 

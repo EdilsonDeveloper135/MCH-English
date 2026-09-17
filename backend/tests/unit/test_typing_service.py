@@ -11,9 +11,10 @@ def test_calculate_accuracy_zero_typed():
 
 
 def test_calculate_wpm_typical():
-    # 1500 characters in 10 minutes -> 30 WPM (spec section 13 example)
+    # 1500 correct characters in 10 minutes -> 30 Net WPM (spec section 13 example)
     assert calculate_wpm(1500, 10 * 60) == 30.0
 
 
 def test_calculate_wpm_zero_duration():
     assert calculate_wpm(100, 0) == 0.0
+

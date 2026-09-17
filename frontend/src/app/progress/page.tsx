@@ -9,7 +9,17 @@ import { BarChartCard } from "@/features/progress/BarChartCard";
 import { WeakWordsChart } from "@/features/progress/WeakWordsChart";
 import { KeyboardHeatmap } from "@/features/typing/components/KeyboardHeatmap";
 import { PersonalGoals } from "@/features/progress/PersonalGoals";
-import type { HistoryPointDTO, OverviewStatsDTO, VocabularyBucketDTO, VocabularyItemDTO } from "@/types";
+import { WpmTrendChart } from "@/features/progress/WpmTrendChart";
+import { AccuracyHeatmap } from "@/features/progress/AccuracyHeatmap";
+import { ErrorPatternChart } from "@/features/progress/ErrorPatternChart";
+import { SessionHistoryTable } from "@/features/progress/SessionHistoryTable";
+import type {
+  HistoryPointDTO,
+  OverviewStatsDTO,
+  SessionStatsSummaryDTO,
+  VocabularyBucketDTO,
+  VocabularyItemDTO,
+} from "@/types";
 
 type TimeRange = "today" | "7d" | "30d" | "all";
 
@@ -28,6 +38,7 @@ export default function ProgressPage() {
   const [history, setHistory] = useState<HistoryPointDTO[] | null>(null);
   const [distribution, setDistribution] = useState<VocabularyBucketDTO[] | null>(null);
   const [weakWords, setWeakWords] = useState<VocabularyItemDTO[] | null>(null);
+  const [statsSummary, setStatsSummary] = useState<SessionStatsSummaryDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,16 +46,18 @@ export default function ProgressPage() {
     setLoading(true);
     setError(null);
     try {
-      const [s, h, d, w] = await Promise.all([
+      const [s, h, d, w, summary] = await Promise.all([
         api.getOverview(),
         api.getHistory(),
         api.getVocabularyDistribution(),
         api.getWeakWords(),
+        api.getSessionStatsSummary(30).catch(() => null),
       ]);
       setStats(s);
       setHistory(h);
       setDistribution(d);
       setWeakWords(w);
+      setStatsSummary(summary);
     } catch {
       setError("No se pudieron cargar las estadísticas de progreso.");
     } finally {
@@ -134,6 +147,20 @@ export default function ProgressPage() {
               <StatCard label="Palabras Dominadas" value={`${stats.words_learned} / ${stats.words_encountered}`} />
             </div>
           </section>
+
+          {/* Advanced Analytics SVG Dashboard */}
+          {statsSummary && (
+            <section className="space-y-6">
+              <WpmTrendChart data={statsSummary.wpm_trend} />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <AccuracyHeatmap data={statsSummary.daily_summary} />
+                <ErrorPatternChart data={statsSummary.error_chars} />
+              </div>
+
+              <SessionHistoryTable sessions={statsSummary.recent_sessions} />
+            </section>
+          )}
 
           {/* Interactive Keyboard Heatmap (Teclas Débiles) */}
           <section className="bg-neutral-950/80 border border-neutral-900 rounded-2xl p-6 shadow-xl">

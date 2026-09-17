@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent as ReactFormEvent,
@@ -153,7 +154,6 @@ export function useTypingSession({
   const [extraChars, setExtraChars] = useState<Record<number, string[]>>({});
   const [correctCount, setCorrectCount] = useState(0);
   const [incorrectCount, setIncorrectCount] = useState(0);
-  const [, setErrors] = useState<ErrorInput[]>([]);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -178,7 +178,6 @@ export function useTypingSession({
     setExtraChars({});
     setCorrectCount(0);
     setIncorrectCount(0);
-    setErrors([]);
     setStartedAt(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetText, resetKey]);
@@ -188,10 +187,9 @@ export function useTypingSession({
     const interval = setInterval(() => {
       const currentNow = Date.now();
       setNow(currentNow);
-      const total = correctCountRef.current + incorrectCountRef.current;
       const elapsed = (currentNow - startedAt) / 1000;
       if (elapsed > 0) {
-        const wpm = Math.round(total / 5 / (elapsed / 60));
+        const wpm = Math.round(correctCountRef.current / 5 / (elapsed / 60));
         wpmHistoryRef.current.push(wpm);
       }
     }, 1000);
@@ -231,7 +229,6 @@ export function useTypingSession({
       setIncorrectCount(incorrectCountRef.current);
       if (errorsRef.current.length > 0) {
         errorsRef.current.pop();
-        setErrors([...errorsRef.current]);
       }
       return;
     }
@@ -260,7 +257,6 @@ export function useTypingSession({
     setCharStates([...charStatesRef.current]);
     setCorrectCount(correctCountRef.current);
     setIncorrectCount(incorrectCountRef.current);
-    setErrors([...errorsRef.current]);
   }, [targetText]);
 
   const applyWordBackspace = useCallback(() => {
@@ -304,7 +300,6 @@ export function useTypingSession({
     setCharStates([...charStatesRef.current]);
     setCorrectCount(correctCountRef.current);
     setIncorrectCount(incorrectCountRef.current);
-    setErrors([...errorsRef.current]);
   }, [targetText]);
 
   const applyCharacter = useCallback(
@@ -382,15 +377,13 @@ export function useTypingSession({
       setCharStates([...charStatesRef.current]);
       setCorrectCount(finalCorrectCount);
       setIncorrectCount(finalIncorrectCount);
-      setErrors([...errorsRef.current]);
 
       checkSentenceCompletion(nextIndex);
 
       if (nextIndex >= targetText.length) {
         const start = startedAtRef.current ?? Date.now();
         const durationSeconds = Math.max((Date.now() - start) / 1000, 0.1);
-        const total = finalCorrectCount + finalIncorrectCount;
-        const finalWpm = Math.round(total / 5 / (durationSeconds / 60));
+        const finalWpm = Math.round(finalCorrectCount / 5 / (durationSeconds / 60));
         const wpmHistory =
           wpmHistoryRef.current.length > 0 ? [...wpmHistoryRef.current, finalWpm] : [finalWpm];
 
@@ -440,22 +433,35 @@ export function useTypingSession({
       const native = e.nativeEvent as InputEvent;
 
       if (!isComplete) {
-        if (native.inputType?.startsWith("delete")) {
+        const inputType = native.inputType ?? "";
+        if (inputType === "deleteWordBackward" || inputType === "deleteWordForward") {
+          applyWordBackspace();
+        } else if (inputType.startsWith("delete")) {
           applyBackspace();
         } else if (native.data && native.data.length === 1) {
+          const idx = currentIndexRef.current;
+          const expected = targetText[idx];
+          if (expected !== undefined && native.data !== expected) {
+            if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+              navigator.vibrate?.(50);
+            }
+          }
           applyCharacter(native.data);
         }
       }
 
       target.value = "";
     },
-    [isComplete, applyBackspace, applyCharacter]
+    [isComplete, applyBackspace, applyWordBackspace, applyCharacter, targetText]
   );
 
-  const totalTyped = correctCount + incorrectCount;
-  const elapsedSeconds = startedAt ? (now - startedAt) / 1000 : 0;
-  const liveWpm = elapsedSeconds > 0 ? Math.round(totalTyped / 5 / (elapsedSeconds / 60)) : 0;
-  const liveAccuracy = totalTyped > 0 ? Math.round((correctCount / totalTyped) * 100) : 100;
+  const { liveWpm, liveAccuracy } = useMemo(() => {
+    const totalTyped = correctCount + incorrectCount;
+    const elapsedSeconds = startedAt ? (now - startedAt) / 1000 : 0;
+    const wpm = elapsedSeconds > 0 ? Math.round(correctCount / 5 / (elapsedSeconds / 60)) : 0;
+    const acc = totalTyped > 0 ? Math.round((correctCount / totalTyped) * 100) : 100;
+    return { liveWpm: wpm, liveAccuracy: acc };
+  }, [correctCount, incorrectCount, startedAt, now]);
 
   return {
     charStates,

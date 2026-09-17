@@ -5,9 +5,9 @@ import type { CharStatus } from "@/features/typing/useTypingSession";
 import { SmoothCaret } from "./SmoothCaret";
 
 const STATE_CLASSES: Record<CharStatus, string> = {
-  pending: "text-gray-400",
-  correct: "text-white",
-  incorrect: "text-red-500 bg-red-500/10",
+  pending: "text-neutral-300 char-transition",
+  correct: "text-white char-transition char-correct-anim",
+  incorrect: "text-red-500 bg-red-500/10 char-transition char-incorrect-anim",
 };
 
 interface TypingTextProps {
@@ -118,7 +118,7 @@ const TypingWordBlock = memo(function TypingWordBlock({
           <span
             key={i}
             data-char-index={i}
-            className={[STATE_CLASSES[state], isCurrent ? "border-l-2 border-cyan-400" : ""].join(" ")}
+            className={[STATE_CLASSES[state], isCurrent ? "border-l-2 border-cyan-400 cursor-blink-css" : ""].join(" ")}
           >
             {display}
           </span>

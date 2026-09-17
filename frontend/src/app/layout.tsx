@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { AppHeader } from "@/components/AppHeader";
-import { CommandPaletteWrapper } from "@/components/CommandPalette";
-import { QuickPractice } from "@/components/QuickPractice";
+import { ClientOverlays } from "@/components/ClientOverlays";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,8 +17,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="antialiased min-h-screen">
         <AppHeader />
         {children}
-        <CommandPaletteWrapper />
-        <QuickPractice />
+        <ClientOverlays />
       </body>
     </html>
   );

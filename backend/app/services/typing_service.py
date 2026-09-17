@@ -5,10 +5,11 @@ def calculate_accuracy(correct_characters: int, total_characters: int) -> float:
     return round((correct_characters / total_characters) * 100, 2)
 
 
-def calculate_wpm(total_characters: int, duration_seconds: float) -> float:
-    """WPM using the standard 5-characters-per-word convention (spec section 13)."""
+def calculate_wpm(correct_characters: int, duration_seconds: float) -> float:
+    """Net WPM using the standard 5-characters-per-word convention (spec section 13).
+    Only correct characters count towards net typing speed."""
     if duration_seconds <= 0:
         return 0.0
     minutes = duration_seconds / 60
-    words = total_characters / 5
+    words = correct_characters / 5
     return round(words / minutes, 2)

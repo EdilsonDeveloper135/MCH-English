@@ -44,22 +44,26 @@ export function FluidCaret({ containerRef, currentIndex, isComplete }: FluidCare
   useEffect(() => {
     if (!containerRef.current || isComplete) return;
 
-    const charElement = containerRef.current.querySelector(`[data-char-index="${currentIndex}"]`) as HTMLElement;
-    if (charElement) {
-      // Measured against the same element the caret is positioned inside, so the two
-      // coordinate systems match (they used to differ by the header's height).
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const charRect = charElement.getBoundingClientRect();
+    let rafId: number;
+    rafId = requestAnimationFrame(() => {
+      if (!containerRef.current || isComplete) return;
+      const charElement = containerRef.current.querySelector(`[data-char-index="${currentIndex}"]`) as HTMLElement;
+      if (charElement) {
+        // Measured against the same element the caret is positioned inside, so the two
+        // coordinate systems match (they used to differ by the header's height).
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const charRect = charElement.getBoundingClientRect();
 
-      setPosition({
-        top: charRect.top - containerRect.top + containerRef.current.scrollTop,
-        left: charRect.left - containerRect.left + containerRef.current.scrollLeft,
-        width: charRect.width,
-        height: charRect.height,
-      });
-      // No scrollIntoView here: TypingDisplay already scrolls its own viewport, and a
-      // smooth scroll per character fought with it and thrashed layout at speed.
-    }
+        setPosition({
+          top: charRect.top - containerRect.top + containerRef.current.scrollTop,
+          left: charRect.left - containerRect.left + containerRef.current.scrollLeft,
+          width: charRect.width,
+          height: charRect.height,
+        });
+      }
+    });
+
+    return () => cancelAnimationFrame(rafId);
   }, [currentIndex, containerRef, isComplete]);
 
   if (isComplete) return null;

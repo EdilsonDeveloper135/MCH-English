@@ -25,6 +25,8 @@ os.environ["DATABASE_URL"] = _TEST_DATABASE_URL
 # mounted volume. A throwaway directory makes the tests hermetic on any host.
 _TEST_AUDIO_CACHE_DIR = tempfile.mkdtemp(prefix="mch-english-audio-cache-")
 os.environ["AUDIO_CACHE_DIR"] = _TEST_AUDIO_CACHE_DIR
+os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
+os.environ.setdefault("SECRET_KEY", "c4f86a9d72e51930b80f1d47a82b3149e6f284c718a39d05e21976a4f5b8c30d")
 
 
 def _admin_database_url() -> str:

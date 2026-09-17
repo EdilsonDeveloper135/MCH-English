@@ -3,7 +3,7 @@ import uuid
 
 import redis
 import structlog
-from rq import Queue
+from rq import Queue, Retry
 from sqlalchemy import delete
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -30,8 +30,40 @@ JOB_TIMEOUT_SECONDS = 900
 PROCESSING_ERROR_MESSAGE = "No se pudo procesar el texto. Revisa el formato e intenta de nuevo."
 
 
+def _on_job_failure(job, connection, type, value, traceback):
+    """Callback executed by RQ if all retries are exhausted, guaranteeing the text
+    is marked 'failed' instead of staying in 'processing' forever."""
+    text_id_str = job.args[0] if job.args else None
+    if text_id_str:
+        try:
+            asyncio.run(_mark_text_failed(text_id_str))
+        except Exception as exc:  # noqa: BLE001
+            logger.error("mark_text_failed_hook_failed", text_id=text_id_str, error=str(exc))
+
+
+async def _mark_text_failed(text_id_str: str) -> None:
+    text_id = uuid.UUID(text_id_str)
+    worker_engine = create_async_engine(settings.database_url, echo=False, poolclass=NullPool)
+    worker_session_maker = async_sessionmaker(worker_engine, expire_on_commit=False)
+    try:
+        async with worker_session_maker() as db:
+            text = await db.get(Text, text_id)
+            if text and text.status == "processing":
+                text.status = "failed"
+                text.error_message = PROCESSING_ERROR_MESSAGE
+                await db.commit()
+    finally:
+        await worker_engine.dispose()
+
+
 def enqueue_process_text(text_id: str) -> None:
-    _queue.enqueue(process_text, text_id, job_timeout=JOB_TIMEOUT_SECONDS)
+    _queue.enqueue(
+        process_text,
+        text_id,
+        job_timeout=JOB_TIMEOUT_SECONDS,
+        retry=Retry(max=2, intervals=[30, 120]),
+        on_failure=_on_job_failure,
+    )
 
 
 def process_text(text_id: str) -> None:
@@ -50,15 +82,20 @@ async def _process_text_async(text_id_str: str) -> None:
             if text is None:
                 return
 
-            text.status = "processing"
-            await db.commit()
+            try:
+                text.status = "processing"
+                await db.commit()
+            except Exception as exc:  # noqa: BLE001
+                logger.error("text_status_init_failed", text_id=str(text_id), error=str(exc))
+                await db.rollback()
+                return
 
             try:
                 # A retried or re-enqueued job must not append a second copy of the
                 # chunks: start from a clean slate for this text.
                 await db.execute(delete(TextChunk).where(TextChunk.text_id == text.id))
 
-                chunks = build_chunks(text.raw_content, text.chunk_mode)
+                chunks = await asyncio.to_thread(build_chunks, text.raw_content, text.chunk_mode)
 
                 for chunk_index, sentences in enumerate(chunks):
                     chunk = TextChunk(
