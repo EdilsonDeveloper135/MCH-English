@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
@@ -90,10 +90,12 @@ export function AppHeader() {
           >
             ← Salir / Volver a Biblioteca
           </Link>
-          <span className="text-xs text-gray-600 font-mono hidden md:block">
-            ⌘K — Command Palette
-          </span>
-          <ConnectivityIndicator />
+          <div className="flex items-center gap-3">
+            <ConnectivityIndicator />
+            <span className="text-xs text-gray-600 font-mono hidden md:block">
+              ⌘K — Command Palette
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -184,7 +186,12 @@ export function AppHeader() {
             aria-label="Menú de navegación móvil"
             className="md:hidden absolute top-full left-0 right-0 bg-neutral-950/98 backdrop-blur border-b border-neutral-800 px-6 py-4 flex flex-col gap-2 z-50 shadow-2xl"
           >
-            <ConnectivityIndicator />
+            <div className="px-4 py-1">
+              <ConnectivityIndicator />
+            </div>
+            <div className="px-4 py-2 border-b border-neutral-900 flex items-center justify-between">
+              <AchievementsBadge />
+            </div>
             {NAV_LINKS.map((link) => {
               const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
               return (

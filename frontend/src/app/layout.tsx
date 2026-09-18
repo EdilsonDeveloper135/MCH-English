@@ -4,6 +4,13 @@ import { AppHeader } from "@/components/AppHeader";
 import { ClientOverlays } from "@/components/ClientOverlays";
 import "./globals.css";
 
+export const viewport: Viewport = {
+  themeColor: "#000000",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export const metadata: Metadata = {
   title: "MCH English",
   description: "Practica mecanografia mientras aprendes ingles.",
@@ -16,14 +23,14 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/icons/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.svg", type: "image/svg+xml" },
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
     ],
-    apple: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [
+      { url: "/icon-192.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
   },
-};
-
-export const viewport: Viewport = {
-  themeColor: "#000000",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -170,7 +170,7 @@ export default function ProgressPage() {
                 Identifica tus teclas lentas o con mayor tasa de error a partir de tus sesiones de práctica.
               </p>
             </div>
-            <KeyboardHeatmap />
+            <KeyboardHeatmap onPracticeKey={() => router.push("/practice/weak-words")} />
           </section>
 
           {/* Objetivos personales, medidos contra las estadísticas reales del usuario */}

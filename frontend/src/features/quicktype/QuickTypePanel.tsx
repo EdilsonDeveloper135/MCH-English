@@ -83,6 +83,11 @@ export function QuickTypePanel({ onSaveToLibrary }: QuickTypePanelProps) {
     } else {
       // Store in session storage and navigate to library
       if (typeof window !== "undefined") {
+        const title = rawText.slice(0, 40).trim() || "Texto QuickType";
+        sessionStorage.setItem(
+          "quicktype_save_text",
+          JSON.stringify({ title, content: rawText })
+        );
         sessionStorage.setItem("mch_prefilled_text", rawText);
         router.push("/library?import=quicktype");
       }

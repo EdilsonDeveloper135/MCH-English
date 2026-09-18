@@ -49,13 +49,19 @@ export default function LibraryPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("import") === "quicktype") {
       try {
-        const raw = sessionStorage.getItem("quicktype_save_text");
+        const raw = sessionStorage.getItem("quicktype_save_text") || sessionStorage.getItem("mch_prefilled_text");
         if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed.title) setTitle(parsed.title);
-          if (parsed.content) setContent(parsed.content);
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed.title) setTitle(parsed.title);
+            if (parsed.content) setContent(parsed.content);
+          } catch {
+            setContent(raw);
+            setTitle(raw.slice(0, 40).trim() || "Texto QuickType");
+          }
           setShowCreateModal(true);
           sessionStorage.removeItem("quicktype_save_text");
+          sessionStorage.removeItem("mch_prefilled_text");
         }
       } catch {
         // ignore parse error
