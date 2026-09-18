@@ -98,7 +98,6 @@ async def overview_for_user(db: AsyncSession, user_id: uuid.UUID) -> dict:
     )
     total_sessions, avg_wpm, avg_accuracy, best_wpm, total_errors, total_seconds = result.one()
 
-
     current_wpm_result = await db.execute(
         select(TypingSession.wpm)
         .where(TypingSession.user_id == user_id, TypingSession.finished_at.is_not(None))
@@ -276,4 +275,3 @@ async def stats_summary_for_user(db: AsyncSession, user_id: uuid.UUID, days: int
         "daily_summary": daily_summary,
         "recent_sessions": recent_sessions,
     }
-

@@ -96,4 +96,3 @@ async def test_dictation_attempt_rejects_unowned_sentence(
 async def test_dictation_finish_nonexistent_session_returns_404(client: AsyncClient, auth_headers: dict[str, str]):
     res = await client.patch("/dictation/sessions/00000000-0000-0000-0000-000000000000/finish", headers=auth_headers)
     assert res.status_code == 404
-

@@ -194,7 +194,11 @@ async def update_grammar_note(
     return GrammarNoteUpdate(grammar_note=sentence.grammar_note)
 
 
-@router.post("/{text_id}/sentences/{sentence_id}/phrases", response_model=PhraseOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{text_id}/sentences/{sentence_id}/phrases",
+    response_model=PhraseOut,
+    status_code=status.HTTP_201_CREATED,
+)
 async def add_phrase(
     text_id: uuid.UUID,
     sentence_id: uuid.UUID,

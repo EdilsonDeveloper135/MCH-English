@@ -24,4 +24,3 @@ async def test_gamification_overview_respects_user_timezone(client: AsyncClient,
     assert "practice_seconds_today" in data
     assert "daily_goal_minutes" in data
     assert "current_streak" in data
-

@@ -28,7 +28,6 @@ _SENTENCE_SPLIT_RE = re.compile(
 _WORD_RE = re.compile(r"[\w'’]+(?:-[\w'’]+)*", re.UNICODE)
 
 
-
 def clean_text(raw: str) -> str:
     """Normalizes line endings/whitespace while preserving paragraph breaks."""
     normalized = raw.replace("\r\n", "\n").replace("\r", "\n")

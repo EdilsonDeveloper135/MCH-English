@@ -11,8 +11,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.api import achievements, auth, dictation, dictionary, gamification, recall, sessions, settings, statistics, texts, vocabulary
+from app.api import (
+    achievements,
+    auth,
+    dictation,
+    dictionary,
+    gamification,
+    recall,
+    sessions,
+    settings,
+    statistics,
+    texts,
+    vocabulary,
+)
 from app.core.config import settings as app_settings
 from app.core.database import get_db
 from app.core.limiter import limiter

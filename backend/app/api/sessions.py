@@ -158,8 +158,8 @@ async def finish_session(
     session_sentences = await session_repository.get_sentences_for_session(db, session)
     error_words = {err.word.lower() for err in payload.errors if err.word}
     await vocabulary_service.record_session_words(db, current_user.id, session_sentences, error_words)
-    await gamification_service.check_and_unlock_achievements(db, current_user.id)
     new_achievements = await achievements_service.evaluate_and_unlock(db, current_user.id)
+    await gamification_service.check_and_unlock_achievements(db, current_user.id)
 
     await _invalidate_user_stats_cache(current_user.id)
 

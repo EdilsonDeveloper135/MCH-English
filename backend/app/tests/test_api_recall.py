@@ -74,7 +74,6 @@ async def test_recall_finish_nonexistent_session_returns_404(client: AsyncClient
     assert res.status_code == 404
 
 
-
 async def test_recall_spanish_to_english_requires_confirmed_translation(
     client: AsyncClient, auth_headers: dict[str, str], process_text_now
 ):

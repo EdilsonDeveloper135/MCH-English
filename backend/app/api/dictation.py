@@ -131,8 +131,11 @@ async def create_dictation_attempt(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dictation session not found")
 
     # IDOR guard: without this, any authenticated user could submit an attempt
-    # against a sentence_id belonging to a different user's private text.
-    sentence = await _get_owned_sentence(db, payload.sentence_id, current_user.id)
+    # against a sentence_id belonging to a different user's private text or unrelated text.
+    if session.text_id is not None:
+        sentence = await text_repository.get_owned_sentence(db, payload.sentence_id, current_user.id, session.text_id)
+    else:
+        sentence = await _get_owned_sentence(db, payload.sentence_id, current_user.id)
     if sentence is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sentence not found")
 

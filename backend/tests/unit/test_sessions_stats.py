@@ -1,4 +1,4 @@
-from app.schemas.sessions import SessionStatsSummaryOut, WpmTrendPoint, ErrorCharStat, DailyStatSummary, SessionHistoryItem
+from app.schemas.sessions import SessionStatsSummaryOut
 
 
 def test_session_stats_summary_schema_serialization():
@@ -41,4 +41,3 @@ def test_stats_cache_key_generation():
 
     user_id = uuid.UUID("11111111-1111-1111-1111-111111111111")
     assert stats_cache_key(user_id, 30) == "cache:stats:11111111-1111-1111-1111-111111111111:30"
-
