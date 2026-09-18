@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { useTypingStore } from "@/stores/typingStore";
 import { api } from "@/services/api";
+import { enqueueSessionResult, isRetryableSyncError } from "@/services/offlineOutbox";
 import type { ChunkDTO, PhraseDTO, TextDTO, TranslationMode } from "@/types";
 import type { Keystroke, PerKeyStats, SessionResult } from "@/types/typing";
 
@@ -95,6 +96,7 @@ export default function PracticePage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [queuedOffline, setQueuedOffline] = useState(false);
 
   const { zenMode, toggleZen } = useZenMode();
   const [isSessionPanelOpen, setIsSessionPanelOpen] = useState(false);
@@ -258,13 +260,29 @@ export default function PracticePage() {
       mergePerKeyStats(sessionKeyStatsRef.current);
       setReplayKeystrokes(keystrokesRef.current.slice());
 
-      let finished;
+      let finished: { wpm: number; accuracy: number; new_achievements?: UnlockedAchievement[] };
+      let queuedOffline = false;
       try {
         finished = await api.finishSession(sessionId, stats);
-      } catch {
-        // Without this the finished session vanished silently on a network hiccup.
-        setSaveError("No se pudo guardar la sesion. Revisa tu conexion e intenta de nuevo.");
-        return;
+      } catch (err) {
+        if (isRetryableSyncError(err)) {
+          // Offline / server unreachable: queue the finished session locally so
+          // no result is ever lost, and show the completion UI with local stats
+          // instead of an error wall. It replays automatically on reconnect.
+          enqueueSessionResult(sessionId, stats);
+          queuedOffline = true;
+          finished = {
+            wpm: Math.round((stats.correct_characters / 5) / (Math.max(0.1, stats.duration_seconds - pausedTime / 1000) / 60)),
+            accuracy:
+              stats.total_characters > 0
+                ? Math.round((stats.correct_characters / stats.total_characters) * 1000) / 10
+                : 100,
+          };
+        } else {
+          // Without this the finished session vanished silently on a network hiccup.
+          setSaveError("No se pudo guardar la sesion. Revisa tu conexion e intenta de nuevo.");
+          return;
+        }
       }
       setSaveError(null);
 
@@ -652,6 +670,12 @@ export default function PracticePage() {
             >
               Reintentar fragmento
             </button>
+          </div>
+        )}
+
+        {queuedOffline && (
+          <div role="status" className="mb-4 rounded-xl border border-cyan-900/60 bg-cyan-950/40 px-4 py-3 text-sm text-cyan-300">
+            Sin conexión: los resultados se guardaron en este dispositivo y se sincronizarán automáticamente al recuperar internet.
           </div>
         )}
 

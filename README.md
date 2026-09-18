@@ -9,8 +9,8 @@ MCH-English es una app de práctica de mecanografía en inglés diseñada para c
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![Backend tests](https://img.shields.io/badge/pytest-105%2F105-brightgreen?logo=pytest&logoColor=white)](./docs/ARCHITECTURE.md#testing)
-[![Frontend tests](https://img.shields.io/badge/vitest-67%2F67-brightgreen?logo=vitest&logoColor=white)](./docs/ARCHITECTURE.md#testing)
+[![Backend tests](https://img.shields.io/badge/pytest-110%2F110-brightgreen?logo=pytest&logoColor=white)](./docs/ARCHITECTURE.md#testing)
+[![Frontend tests](https://img.shields.io/badge/vitest-113%2F113-brightgreen?logo=vitest&logoColor=white)](./docs/ARCHITECTURE.md#testing)
 [![CI](https://github.com/EdilsonDeveloper135/MCH-English/actions/workflows/ci.yml/badge.svg)](https://github.com/EdilsonDeveloper135/MCH-English/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
@@ -26,18 +26,34 @@ Las apps de mecanografía (Monkeytype, Keybr, TypeRacer) son excelentes para vel
 - **Smooth Caret** — el cursor se interpola por CSS/hardware en vez de saltar carácter a carácter, igual que Monkeytype.
 - **Borrado atómico de palabra** (`Ctrl+Backspace` / `Cmd+Backspace`) — descartá una palabra entera fallada en un solo golpe, sin machacar Backspace letra por letra.
 - **Buffer de caracteres extra** — tipear de más al final de una palabra no rompe el estado del ejercicio; queda registrado como error sin desalinear el cursor.
-- **Feedback sonoro opcional** (4 perfiles, configurables en Ajustes) y **Modo Zen** con paletas antifatiga (Nord, Catppuccin, Sepia).
-- Navegación por teclado en Recall y Dictation (`Enter`/`Espacio` para avanzar, `Ctrl+Espacio` reproducir/pausar audio, `Alt+R` repetir), y paleta de comandos con `⌘K` / `Ctrl+K`.
+- **Feedback sonoro opcional** (4 perfiles, configurables en Ajustes) y **Modo Zen** con paletas antifatiga (Nord, Catppuccin, Sepia, OLED).
+- **Ghost Runner y telemetría por tecla** — registro de precisión histórica por carácter y curva de cadencia downsampled para comparar tu progreso.
+- **Navegación por teclado y hotkeys globales** — `Enter`/`Espacio` para avanzar en rondas, `Ctrl+Espacio` y `Alt+R` para audio en Dictation, y paleta global con `⌘K` / `Ctrl+K`.
 
 ### Modos de práctica
 - **Lectura guiada por chunks** — Smart Chunking divide cualquier texto en fragmentos de 30–150 palabras sin cortar oraciones a la mitad.
-- **Palabras débiles** — sesiones generadas automáticamente a partir de tu propio historial de errores.
-- **Recall (Missing Words)** — se ocultan palabras clave de una oración ya practicada; las volvés a escribir de memoria.
-- **Dictation** — se te lee la oración en voz (eSpeak-NG local) y la escribís al dictado.
+- **Práctica libre (QuickType)** — modo efímero inmediato (`/quicktype`) para pegar y tipear cualquier fragmento al instante con chunking en el navegador, sin guardarlo en base de datos.
+- **Palabras débiles** — sesiones generadas automáticamente a partir de tu propio historial de errores y decaimiento de dominio.
+- **Recall (Missing Words & Español → Inglés)** — se ocultan palabras clave de oraciones practicadas o se tipea por traducción inversa guiada por alineación bilingüe.
+- **Dictation** — síntesis de voz local fonética (eSpeak-NG) y escritura al dictado con repetición y ajuste de velocidad.
+
+### Gestión de textos e importación local
+- **Importador local de PDF y ePub** — extracción de texto 100% en el cliente con `pdfjs-dist` y `epubjs` directamente en el navegador, con cero llamadas de red y total privacidad offline.
+- **Alineación Gale-Church interactiva** — editor visual para verificar y corregir el emparejamiento de oraciones inglés-español (`/library/[textId]/align`).
+- **Anotaciones pedagógicas** — soporte para notas gramaticales y frases idiomáticas por oración.
+
+### PWA y soporte offline
+- **App web progresiva (PWA)** — instalable en escritorio y dispositivos móviles con manifest y soporte standalone.
+- **Sincronización Outbox resiliente** — Service Worker propio (`sw.js`) con precaché del shell, almacenamiento de audios en IndexedDB y cola de salida que guarda las sesiones completadas sin internet y las sincroniza automáticamente al reconectar.
+
+### Estadísticas avanzadas, analítica y vocabulario
+- **Gráficos en SVG puro** — curva de evolución de WPM (`WpmTrendChart`), calendario de calor de precisión estilo GitHub (`AccuracyHeatmap`) y análisis de patrones de error (`ErrorPatternChart`).
+- **Historial paginado y exportación CSV** — tabla interactiva ordenada con descarga de métricas en formato CSV estándar.
+- **Explorador de vocabulario** — panel en `/vocabulary` con cálculo de Mastery Score, frecuencia de errores y definiciones de FreeDict eng-spa.
 
 ### Gamificación
-- XP, niveles, rachas diarias, logros desbloqueables.
-- Modal de resumen post-sesión con curva de WPM, precisión y las palabras que más fallaste.
+- XP, niveles progresivos, racha diaria calculada según la **zona horaria local** del usuario y catálogo de 12 logros con galería dedicada (`/achievements`), toasts y badges.
+- Modal de resumen post-sesión con desglose de WPM neto, precisión y palabras con fallo.
 
 ## Arquitectura
 
@@ -107,17 +123,17 @@ producción: `standalone`, sin devDependencies ni código fuente):
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
-# Tests de backend (105 tests)
+# Tests de backend (110 tests)
 docker exec mch-english-backend-1 pytest -v
 
-# Tests de frontend (67 tests)
+# Tests de frontend (113 tests)
 docker exec mch-english-frontend-1 npm test
 
 # Linter y tipos de frontend
 docker exec mch-english-frontend-1 npm run lint
 docker exec mch-english-frontend-1 npx tsc --noEmit
 
-# Build de producción del frontend (verifica que las 14 rutas compilen)
+# Build de producción del frontend (verifica que las 15 rutas compilen)
 docker exec mch-english-frontend-1 npm run build
 
 # Nueva migración de base de datos (tras cambiar un modelo)
@@ -132,7 +148,7 @@ docker compose logs -f backend
 
 ```
 MCH-English/
-├── frontend/          # Next.js 15 (App Router) + TypeScript + Tailwind + Zustand
+├── frontend/          # Next.js 15 (App Router) + TypeScript + Tailwind + Zustand + PWA
 ├── backend/           # FastAPI + SQLAlchemy async + Alembic + Pydantic v2
 │   ├── app/
 │   │   ├── api/       # Routers HTTP
@@ -153,8 +169,8 @@ MCH-English/
 
 ## Documentación adicional
 
-- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — flujo de datos completo, decisiones de seguridad, resumen de testing.
-- [`docs/ISSUES_AND_ROADMAP.md`](./docs/ISSUES_AND_ROADMAP.md) — mejoras futuras listas para abrir como issues (PWA, importación PDF/ePub, multijugador, gráficas avanzadas).
+- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — flujo de datos completo, módulos frontend/backend, decisiones de seguridad y testing.
+- [`docs/ISSUES_AND_ROADMAP.md`](./docs/ISSUES_AND_ROADMAP.md) — roadmap del proyecto y funcionalidades futuras (modo multijugador con WebSockets, backlog).
 - [`docs/audits/`](./docs/audits/) — historial completo de auditorías técnicas y planes de remediación ya cerrados.
 
 ## Licencia

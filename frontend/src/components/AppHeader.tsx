@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { useTypingStore } from "@/stores/typingStore";
+import { useConnectivityStore } from "@/stores/connectivityStore";
 import { useApplyTheme } from "@/features/typing/ZenToggle";
 import { api } from "@/services/api";
 import { AchievementsBadge } from "@/components/AchievementsBadge";
@@ -22,6 +23,37 @@ const NAV_LINKS = [
 
 const SESSION_PREFIXES = ["/practice", "/recall", "/dictation"];
 const HIDDEN_PATHS = ["/", "/login", "/register"];
+
+/* Subtle, non-blocking connectivity pill. Hidden entirely while online with an
+ * empty outbox so it never adds noise to the default UI. */
+function ConnectivityIndicator() {
+  const isOnline = useConnectivityStore((s) => s.isOnline);
+  const pending = useConnectivityStore((s) => s.pendingOutboxCount);
+  if (isOnline && pending === 0) return null;
+
+  const label = isOnline
+    ? `${pending} resultado${pending === 1 ? "" : "s"} pendiente${pending === 1 ? "" : "s"}`
+    : pending > 0
+      ? `Sin conexión · ${pending} pendiente${pending === 1 ? "" : "s"}`
+      : "Sin conexión";
+
+  return (
+    <span
+      role="status"
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+        isOnline
+          ? "border-cyan-800 bg-cyan-950/60 text-cyan-300"
+          : "border-amber-800 bg-amber-950/60 text-amber-300"
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-cyan-400" : "bg-amber-400 animate-pulse"}`}
+      />
+      {label}
+    </span>
+  );
+}
 
 export function AppHeader() {
   const pathname = usePathname();
@@ -61,6 +93,7 @@ export function AppHeader() {
           <span className="text-xs text-gray-600 font-mono hidden md:block">
             ⌘K — Command Palette
           </span>
+          <ConnectivityIndicator />
         </div>
       </div>
     );
@@ -79,6 +112,11 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-20 bg-black border-b border-neutral-900">
+      {/* Offline/pending-sync pill lives at header level on mobile so it's visible
+          even with the hamburger menu closed; desktop shows it inside the nav. */}
+      <div className="md:hidden px-6 pt-2 max-w-3xl mx-auto flex justify-end">
+        <ConnectivityIndicator />
+      </div>
       <div className="flex items-center justify-between px-6 py-4 max-w-3xl mx-auto text-sm relative">
         <Link
           href="/library"
@@ -106,6 +144,7 @@ export function AppHeader() {
               </Link>
             );
           })}
+          <ConnectivityIndicator />
           <AchievementsBadge />
           {/* A hint, not a control: the palette opens with the keyboard shortcut. */}
           <span className="text-gray-600 font-mono text-xs border border-gray-800 rounded px-1.5 py-0.5" title="Paleta de comandos (⌘K / Ctrl+K)">
@@ -145,6 +184,7 @@ export function AppHeader() {
             aria-label="Menú de navegación móvil"
             className="md:hidden absolute top-full left-0 right-0 bg-neutral-950/98 backdrop-blur border-b border-neutral-800 px-6 py-4 flex flex-col gap-2 z-50 shadow-2xl"
           >
+            <ConnectivityIndicator />
             {NAV_LINKS.map((link) => {
               const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
               return (

@@ -61,7 +61,7 @@ def enqueue_process_text(text_id: str) -> None:
         process_text,
         text_id,
         job_timeout=JOB_TIMEOUT_SECONDS,
-        retry=Retry(max=2, intervals=[30, 120]),
+        retry=Retry(max=2, interval=[30, 120]),
         on_failure=_on_job_failure,
     )
 

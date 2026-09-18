@@ -138,7 +138,7 @@ export function ImporterModal({
           <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono">
             <span>🔒</span>
             <span>
-              <strong>100% Offline & Local:</strong> Tus archivos se procesan exclusivamente en tu navegador. Ningún dato se envía a servidores externos ni APIs de IA.
+              <strong>100% Offline &amp; Local:</strong> Tus archivos se procesan exclusivamente en tu navegador. Ningún dato se envía a servidores externos ni APIs de IA.
             </span>
           </div>
         </div>

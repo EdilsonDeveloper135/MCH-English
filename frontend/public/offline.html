@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <title>Sin conexión — MCH English</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #000;
+        color: #e5e5e5;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      main { max-width: 28rem; padding: 2rem; text-align: center; }
+      h1 { color: #22d3ee; font-size: 1.25rem; }
+      p { color: #a3a3a3; line-height: 1.6; }
+      button {
+        margin-top: 1rem;
+        background: #22d3ee;
+        color: #000;
+        border: 0;
+        border-radius: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        min-height: 44px;
+      }
+      button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Sin conexión</h1>
+      <p>
+        Esta página no está en caché todavía. Las sesiones de práctica ya abiertas
+        siguen funcionando sin internet y tus resultados se sincronizarán
+        automáticamente al recuperar la conexión.
+      </p>
+      <button type="button" onclick="location.reload()">Reintentar</button>
+    </main>
+  </body>
+</html>

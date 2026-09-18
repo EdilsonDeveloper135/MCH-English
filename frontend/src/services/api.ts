@@ -28,7 +28,7 @@ import type {
   WeakWordsSessionDTO,
 } from "@/types";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // Dictionary entries never change at runtime, so a repeated lookup of the same word
 // (e.g. the same typo made twice in one session) is served from memory instead of
@@ -307,10 +307,11 @@ export const api = {
   finishDictationSession: (sessionId: string) =>
     request<void>(`/dictation/sessions/${sessionId}/finish`, { method: "PATCH" }),
 
-  // <audio src> can't carry an Authorization header, so audio is fetched as a blob
-  // and exposed as an Object URL instead. Caller is responsible for revoking it
-  // (URL.revokeObjectURL) once no longer needed.
-  getDictationAudioUrl: async (sentenceId: string): Promise<string> => {
+  // <audio src> can't carry an Authorization header, so audio is fetched as a blob.
+  // The raw blob is returned (not an Object URL) so the caller can both warm the
+  // service worker's offline audio store and build its own URL -- callers are
+  // responsible for URL.revokeObjectURL once done.
+  getDictationAudio: async (sentenceId: string): Promise<Blob> => {
     const token = useAuthStore.getState().token;
     const headers: Record<string, string> = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -318,7 +319,11 @@ export const api = {
     const response = await fetch(`${BASE_URL}/dictation/audio/${sentenceId}`, { headers });
     if (!response.ok) throw new ApiError(response.status, response.statusText);
 
-    const blob = await response.blob();
+    return response.blob();
+  },
+
+  getDictationAudioUrl: async (sentenceId: string): Promise<string> => {
+    const blob = await api.getDictationAudio(sentenceId);
     return URL.createObjectURL(blob);
   },
 };

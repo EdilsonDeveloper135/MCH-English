@@ -94,6 +94,7 @@ async def _build_alignment_out(db: AsyncSession, text: Text) -> AlignmentOut:
                 spanish_index=spanish_position[link.translation_sentence_id],
             )
             for link in links
+            if link.english_sentence_id in english_position and link.translation_sentence_id in spanish_position
         ],
     )
 

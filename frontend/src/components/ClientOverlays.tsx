@@ -12,11 +12,17 @@ const QuickPractice = dynamic(
   { ssr: false }
 );
 
+const PwaRegistry = dynamic(
+  () => import("@/components/PwaRegistry").then((m) => m.PwaRegistry),
+  { ssr: false }
+);
+
 export function ClientOverlays() {
   return (
     <>
       <CommandPaletteWrapper />
       <QuickPractice />
+      <PwaRegistry />
     </>
   );
 }

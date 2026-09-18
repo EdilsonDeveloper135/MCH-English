@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { api } from "@/services/api";
+import { enqueueSessionResult, isRetryableSyncError } from "@/services/offlineOutbox";
 import { TypingText } from "@/features/typing/TypingText";
 import { TypingCaptureInput } from "@/features/typing/TypingCaptureInput";
 import { TypingStats } from "@/features/typing/TypingStats";
@@ -26,6 +27,7 @@ function WeakWordsPractice() {
   const [session, setSession] = useState<WeakWordsSessionDTO | null>(null);
   const [done, setDone] = useState<{ wpm: number; accuracy: number } | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [queuedOffline, setQueuedOffline] = useState(false);
   const [errorWordInfo, setErrorWordInfo] = useState<{ word: string; position: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -57,8 +59,21 @@ function WeakWordsPractice() {
         const finished = await api.finishSession(session.session_id, stats);
         setDone({ wpm: finished.wpm, accuracy: finished.accuracy });
         setSaveError(null);
-      } catch {
-        setSaveError("No se pudo guardar la sesion. Revisa tu conexion.");
+      } catch (err) {
+        if (isRetryableSyncError(err)) {
+          // Offline: keep the result in the outbox and still let the user see
+          // their completion screen with locally-computed stats.
+          enqueueSessionResult(session.session_id, stats);
+          const accuracy =
+            stats.total_characters > 0
+              ? Math.round((stats.correct_characters / stats.total_characters) * 1000) / 10
+              : 100;
+          const wpm = Math.round((stats.correct_characters / 5) / (Math.max(0.1, stats.duration_seconds) / 60));
+          setDone({ wpm, accuracy });
+          setQueuedOffline(true);
+        } else {
+          setSaveError("No se pudo guardar la sesion. Revisa tu conexion.");
+        }
       }
     },
     [session]
@@ -104,6 +119,11 @@ function WeakWordsPractice() {
         )}
 
         {saveError && <p className="text-sm text-red-300 mt-4">{saveError}</p>}
+        {queuedOffline && (
+          <p role="status" className="text-sm text-cyan-300 mt-4">
+            Sin conexión: el resultado se sincronizará automáticamente al recuperar internet.
+          </p>
+        )}
 
         {isDone && done ? (
           <div className="text-center py-16">

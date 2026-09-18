@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/services/api";
+import { cacheDictationAudio } from "@/services/pwa";
 
 const SPEEDS = [0.75, 1, 1.25, 1.5];
 
@@ -26,14 +27,14 @@ export function AudioPlayer({ sentenceId }: AudioPlayerProps) {
     setUrl(null);
 
     api
-      .getDictationAudioUrl(sentenceId)
-      .then((u) => {
-        if (cancelled) {
-          URL.revokeObjectURL(u);
-          return;
-        }
-        objectUrl = u;
-        setUrl(u);
+      .getDictationAudio(sentenceId)
+      .then((blob) => {
+        if (cancelled) return;
+        // Warm the SW's IndexedDB audio store so this sentence keeps playing
+        // even if the connection drops mid-session.
+        cacheDictationAudio(sentenceId, blob);
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
         setLoading(false);
       })
       .catch(() => {

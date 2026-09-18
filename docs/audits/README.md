@@ -11,6 +11,6 @@ Estos documentos son el **registro histórico** del proceso de auditoría y reme
 ## Línea de tiempo
 
 1. **Auditoría inicial** → `IMPROVEMENT_PLAN.md` (Fases 0–7, 30 tareas) → cerrada en `FINAL_AUDIT.md`.
-2. **Segunda auditoría** (`AUDIT_REPORT.md` actual) → nuevo `IMPROVEMENT_PLAN.md` (Fase 2, 34 tareas P1–P3) → estado actual del proyecto, verificado empíricamente el 2026-09-10 (98/98 tests backend, 46/46 tests frontend, lint y build limpios — ver el README principal).
+2. **Segunda auditoría** (`AUDIT_REPORT.md` actual) → nuevo `IMPROVEMENT_PLAN.md` (Fase 2, 34 tareas P1–P3) → consolidación de Fase 3 y soporte PWA (110 tests backend, 113 tests frontend, lint y build limpios — ver el README principal).
 
 Si vas a auditar el proyecto de nuevo, el patrón esperado es: nuevo hallazgo → nueva sección `IMPROVEMENT_PLAN.md` (o un archivo `IMPROVEMENT_PLAN_v3.md` si este ya se considera cerrado) → issues en GitHub para trabajo puntual (ver [`docs/ISSUES_AND_ROADMAP.md`](../ISSUES_AND_ROADMAP.md)).

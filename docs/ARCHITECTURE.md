@@ -47,8 +47,11 @@ Todo el pipeline de idioma es determinístico y auditable línea por línea:
 3. **Alineación Gale-Church** (`app/services/alignment_service.py`, `translation_service.py`) — si el usuario pegó también su propia traducción, esta etapa empareja cada oración en inglés con su (o sus) oración(es) en español por longitud relativa, marcando el resultado como `confirmed` o `needs_review` si la heurística no está segura. La programación dinámica corre en banda alrededor de la diagonal (ambos lados son el mismo texto en orden), lo que la hace lineal en número de oraciones en vez de cuadrática: 1.000 oraciones por lado bajaron de 15,9 s / 132 MB a 1,9 s / 19 MB.
 4. El worker marca el texto `status=ready` (o `failed` con el error capturado) y libera la sesión de DB.
 5. **Consulta de diccionario** — al fallar una palabra durante el tipeo, el frontend pide `GET /dictionary/{word}`, resuelto contra las entradas de FreeDict ya cargadas en Postgres (`seed_dictionary.py`, corre una vez en el arranque vía el servicio `migrate`). Cacheado en memoria en el cliente (`api.ts`) para no repetir la misma consulta dos veces.
-6. **Sesión de práctica** — el motor de tipeo (`useTypingSession.ts`) vive enteramente en el cliente; solo al terminar un chunk se manda el resumen (`POST /sessions/{id}`, o el equivalente en Recall/Dictation) para persistir WPM, precisión, errores y XP.
-7. **Estado del cliente** — Zustand (`stores/authStore.ts`) guarda únicamente el token JWT y el email, persistido en `localStorage`; todo lo demás (texto actual, progreso de la sesión, estados de gamificación) vive en el estado local del componente de cada página y se recarga desde la API en cada visita — no hay un store global de datos de dominio.
+6. **Sesión de práctica** — el motor de tipeo (`useTypingSession.ts`) vive enteramente en el cliente; solo al terminar un chunk se manda el resumen (`PATCH /sessions/{session_id}`, o su equivalente en Recall `PATCH /recall/sessions/{id}/finish` y Dictation `PATCH /dictation/sessions/{id}/finish`) para persistir WPM, precisión, errores y XP.
+7. **Estado del cliente (Zustand)** — estructurado en tres stores desacoplados:
+   - `authStore.ts`: token JWT y email del usuario, persistido en `localStorage`.
+   - `connectivityStore.ts`: estado global reactivo de red (`isOnline`) y conteo de sesiones en cola de salida (`pendingOutboxCount`) reflejado en el pill de conectividad del `AppHeader`.
+   - `typingStore.ts`: preferencias de mecanografía (tema visual, tamaño de fuente, estilo/velocidad de cursor, perfiles de sonido, modo zen), modo focus, acumulación por lotes de estadísticas por tecla (`perKeyStats`) y telemetría de carrera fantasma (`ghostData`) con downsampling acotado en `localStorage`.
 
 ## Seguridad y resiliencia (capas agregadas en la Fase 2 de remediación)
 
@@ -62,6 +65,11 @@ Todo el pipeline de idioma es determinístico y auditable línea por línea:
 - **`/health` con verificación real**: `SELECT 1` contra Postgres + `PING` contra Redis (con timeout explícito), responde `503` si cualquiera está caído — no un `200` incondicional.
 - **Logging estructurado**: cada request se loguea en JSON (`structlog`) con `request_id` (sanitizado alfanumérico o autogenerado), método, path, status y duración.
 - **Contenedores sin root y Multi-Stage**: `backend` corre como `appuser` con build multi-stage mínimo, `frontend` como `node` en standalone.
+- **PWA y resiliencia offline**:
+  - Service Worker nativo en JavaScript puro (`public/sw.js`, sin dependencias opacas) que precachea el shell de la aplicación (`mch-shell-v1`) y provee fallback `offline.html`.
+  - Almacenamiento local de audio en IndexedDB (`dictation-audio`) para que las sesiones de Dictation sigan reproduciendo audio aun si se pierde la conexión a internet.
+  - Cola de salida asíncrona (`offlineOutbox.ts`) que captura fallos de red transitorios al guardar sesiones de práctica y las reintenta automáticamente al detectar reconexión (`window.ononline` o mensaje `REQUEST_OUTBOX_FLUSH`).
+- **Cálculo honesto de rachas por zona horaria (`timezone`)**: configuración por usuario en `UserSettings` (`settings.timezone`) utilizada por el backend para particionar días de actividad según la fecha calendario local del usuario, evitando saltos o pérdidas de racha por desfasaje con UTC.
 
 ## Módulos de Experiencia de Usuario, Analítica y Gamificación (Fase 3)
 
@@ -115,7 +123,7 @@ Esta fase incorpora seis módulos interactivos manteniendo rigurosamente el prin
 
 ## Testing
 
-- **Backend**: Tests unitarios y de integración (`pytest`) cubriendo chunking, alineación Gale-Church, servicios de mecanografía, sesiones con agregaciones estadísticas y el catálogo de logros.
-- **Frontend**: 24 suites de pruebas con 99 tests unitarios (`vitest` + Testing Library) verificando el motor de tipeo, hooks de teclado, renderizado de gráficos SVG accesibles, modales de importación, badges y toasts de logros.
+- **Backend**: 110 tests unitarios y de integración (`pytest`) cubriendo chunking, alineación Gale-Church, servicios de mecanografía, sesiones con agregaciones estadísticas, catálogo de logros, seguridad y rate limiting.
+- **Frontend**: 27 suites de pruebas con 113 tests unitarios (`vitest` + Testing Library) verificando el motor de tipeo, hooks de teclado, renderizado de gráficos SVG accesibles, modales de importación, badges y toasts de logros, Service Worker y cola offline Outbox.
 - **CI** (`.github/workflows/ci.yml`): lint + tipos + tests de frontend, pytest de backend contra Postgres/Redis reales de CI (incluye verificar que el historial completo de migraciones de Alembic aplica limpio desde cero), y build de ambos Dockerfiles — en cada push/PR a `main`.
 

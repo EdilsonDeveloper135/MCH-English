@@ -18,7 +18,7 @@ from app.schemas.recall import (
     RecallSessionOut,
     RoundOut,
 )
-from app.services import gamification_service, recall_service
+from app.services import achievements_service, gamification_service, recall_service
 from app.services.typing_service import calculate_accuracy
 
 router = APIRouter()
@@ -145,3 +145,4 @@ async def finish_recall_session(
     session.finished_at = datetime.now(timezone.utc)
     await db.commit()
     await gamification_service.check_and_unlock_achievements(db, current_user.id)
+    await achievements_service.evaluate_and_unlock(db, current_user.id)
