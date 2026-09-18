@@ -76,7 +76,8 @@ async def test_logout_revokes_token_and_rejects_subsequent_requests(client: Asyn
     # Verify access is now rejected with 401
     me_after = await client.get("/auth/me", headers=headers)
     assert me_after.status_code == 401
-    assert "revoked" in me_after.json()["detail"].lower() or "expired" in me_after.json()["detail"].lower() or "invalid" in me_after.json()["detail"].lower()
+    detail = me_after.json()["detail"].lower()
+    assert any(w in detail for w in ("revoked", "expired", "invalid"))
 
 
 async def test_login_rate_limiting_returns_429_after_limit_exceeded(client: AsyncClient):
@@ -86,14 +87,13 @@ async def test_login_rate_limiting_returns_429_after_limit_exceeded(client: Asyn
         # 5 attempts are allowed per minute on /auth/login
         for _ in range(5):
             await client.post("/auth/login", json={"email": "nonexistent@example.com", "password": "wrong"})
-        
+
         # 6th attempt must return 429 Too Many Requests
         sixth = await client.post("/auth/login", json={"email": "nonexistent@example.com", "password": "wrong"})
         assert sixth.status_code == 429
         assert "retry-after" in sixth.headers
     finally:
         limiter.enabled = False
-
 
 
 async def test_logout_requires_a_valid_token(client: AsyncClient):

@@ -96,7 +96,7 @@ async def create_recall_attempt(
     if payload.blanks:
         content_len = len(sentence.content)
         expected_words = [
-            sentence.content[max(0, b.start) : min(content_len, b.end)] for b in payload.blanks
+            sentence.content[max(0, b.start): min(content_len, b.end)] for b in payload.blanks
         ]
         # A single space between blanks, matching buildBlankTargetText on the
         # frontend -- both `expected` and `payload.typed` are space-separated word

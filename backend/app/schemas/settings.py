@@ -28,4 +28,3 @@ class UserSettingsUpdate(BaseModel):
             return candidate
         except (ZoneInfoNotFoundError, ValueError) as exc:
             raise ValueError(f"Zona horaria inválida: {candidate}") from exc
-

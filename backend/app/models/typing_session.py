@@ -5,7 +5,12 @@ from sqlalchemy import ARRAY, DateTime, Float, ForeignKey, Index, Integer, Strin
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from typing import TYPE_CHECKING
+
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class TypingSession(Base):

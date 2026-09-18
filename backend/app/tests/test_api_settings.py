@@ -41,4 +41,3 @@ async def test_update_settings_validation(client: AsyncClient, auth_headers: dic
     # timezone must be a valid IANA timezone
     res_invalid_tz = await client.patch("/settings", json={"timezone": "Mars/Olympus_Mons"}, headers=auth_headers)
     assert res_invalid_tz.status_code == 422
-

@@ -133,8 +133,6 @@ async def test_update_translation_and_alignment_endpoints(
     assert confirm_res.json()["alignment_status"] == "confirmed"
 
 
-
-
 async def test_progress_is_clamped_to_the_real_chunk_count(
     client: AsyncClient, auth_headers: dict[str, str], process_text_now
 ):

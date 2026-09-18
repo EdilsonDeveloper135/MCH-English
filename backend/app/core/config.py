@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     secret_key: str
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 1440
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: list[str] | str = ["http://localhost:3000"]
     rate_limit_enabled: bool = True
     # Dictation WAV cache lives on a mounted volume, not in Postgres (see
     # tts_service.py) -- avoids bloating the relational DB with binary blobs.

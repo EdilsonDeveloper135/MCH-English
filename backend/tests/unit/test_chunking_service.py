@@ -63,5 +63,3 @@ def test_split_sentences_handles_ellipsis_and_quotes():
     paragraph = 'He waited… Nothing happened. "Are you sure?" She asked.'
     sentences = split_sentences(paragraph)
     assert sentences == ["He waited…", "Nothing happened.", '"Are you sure?"', "She asked."]
-
-

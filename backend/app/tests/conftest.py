@@ -1,4 +1,3 @@
-import asyncio
 import os
 import shutil
 import tempfile
@@ -55,7 +54,6 @@ app_settings.rate_limit_enabled = False
 limiter.enabled = False
 
 
-
 @pytest.fixture(scope="session", autouse=True)
 def _cleanup_audio_cache_dir():
     yield
@@ -75,8 +73,6 @@ async def _setup_test_database():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await engine.dispose()
-
-
 
 
 @pytest_asyncio.fixture(autouse=True)

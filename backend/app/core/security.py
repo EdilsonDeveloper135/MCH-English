@@ -80,13 +80,12 @@ def get_redis_client() -> aioredis.Redis:
     except RuntimeError:
         current_loop = None
 
-    needs_reconnect = (
+    if (
         _redis_client is None
         or _redis_url != settings.redis_url
-        or (_redis_loop is not None and (_redis_loop.is_closed() or _redis_loop != current_loop))
-    )
-
-    if needs_reconnect:
+        or _redis_loop != current_loop
+        or (_redis_loop is not None and _redis_loop.is_closed())
+    ):
         _redis_url = settings.redis_url
         _redis_loop = current_loop
         _redis_client = aioredis.from_url(

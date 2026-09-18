@@ -125,5 +125,3 @@ async def _process_text_async(text_id_str: str) -> None:
                 await db.commit()
     finally:
         await worker_engine.dispose()
-
-

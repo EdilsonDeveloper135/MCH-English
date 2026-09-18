@@ -9,9 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories import gamification_repository, settings_repository, text_repository
 from app.services import statistics_service
-
-XP_PER_LEVEL_STEP = 300  # one normal Practice chunk (60-80 words / 300-400 correct
-                          # characters) reaches level 2 -- ni instant nor eternal
+# One normal Practice chunk (60-80 words / 300-400 correct characters)
+# reaches level 2 -- ni instant nor eternal
+XP_PER_LEVEL_STEP = 300
 
 
 def compute_streak(active_dates: list[date], today: date) -> tuple[int, int]:
