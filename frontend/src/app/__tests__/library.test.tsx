@@ -88,7 +88,9 @@ describe("LibraryPage", () => {
     const addBtn = screen.getByRole("button", { name: "+ Agregar Texto" });
     fireEvent.click(addBtn);
 
-    expect(screen.getByRole("dialog", { name: "Agregar Nuevo Texto" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Agregar Nuevo Texto" })).toBeInTheDocument();
+    });
 
     const titleInput = screen.getByPlaceholderText(/ej: Alice in Wonderland/i);
     const contentInput = screen.getByPlaceholderText(/Pega aquí el texto en inglés/i);
