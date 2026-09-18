@@ -30,9 +30,23 @@ export function AppHeader() {
   const isFocusMode = useTypingStore((s) => s.isFocusMode);
   const [isOpen, setIsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
 
   // Mounted on every page, so this is where the saved theme gets applied.
   useApplyTheme();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsOnline(navigator.onLine);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   useGlobalHotkeys({
     onToggleHelp: () => setIsHelpOpen((prev) => !prev),
@@ -58,9 +72,21 @@ export function AppHeader() {
           >
             ← Salir / Volver a Biblioteca
           </Link>
-          <span className="text-xs text-gray-600 font-mono hidden md:block">
-            ⌘K — Command Palette
-          </span>
+          <div className="flex items-center gap-3">
+            {!isOnline && (
+              <span
+                role="status"
+                className="px-2 py-0.5 text-xs font-mono rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1.5"
+                title="Sin conexión a Internet"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                Sin conexión
+              </span>
+            )}
+            <span className="text-xs text-gray-600 font-mono hidden md:block">
+              ⌘K — Command Palette
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -89,6 +115,16 @@ export function AppHeader() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-4 text-gray-400" aria-label="Navegación principal">
+          {!isOnline && (
+            <span
+              role="status"
+              className="px-2 py-0.5 text-xs font-mono rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1.5"
+              title="Sin conexión a Internet"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              Sin conexión
+            </span>
+          )}
           {NAV_LINKS.map((link) => {
             const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
             const isSecondary = link.href === "/settings" || link.href === "/gamification" || link.href === "/vocabulary" || link.href === "/progress";
@@ -145,6 +181,18 @@ export function AppHeader() {
             aria-label="Menú de navegación móvil"
             className="md:hidden absolute top-full left-0 right-0 bg-neutral-950/98 backdrop-blur border-b border-neutral-800 px-6 py-4 flex flex-col gap-2 z-50 shadow-2xl"
           >
+            {!isOnline && (
+              <div
+                role="status"
+                className="px-4 py-2 text-xs font-mono rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-2 mb-1"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span>Modo sin conexión</span>
+              </div>
+            )}
+            <div className="px-4 py-2 border-b border-neutral-900 flex items-center justify-between">
+              <AchievementsBadge />
+            </div>
             {NAV_LINKS.map((link) => {
               const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
               return (

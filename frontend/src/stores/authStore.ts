@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 interface AuthState {
   token: string | null;
@@ -30,6 +30,15 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "mch-english-auth",
+      storage: createJSONStorage(() =>
+        typeof window !== "undefined"
+          ? window.localStorage
+          : {
+              getItem: () => null,
+              setItem: () => {},
+              removeItem: () => {},
+            }
+      ),
       // sessionExpiredMessage is a one-shot UI signal, not account state -- it must
       // not survive a browser restart and reappear on an unrelated future login.
       partialize: (state) => ({ token: state.token, email: state.email }),

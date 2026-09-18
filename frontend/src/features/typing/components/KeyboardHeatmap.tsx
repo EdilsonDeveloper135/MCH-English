@@ -57,8 +57,8 @@ export function KeyboardHeatmap({ onPracticeKey, customPerKeyStats }: KeyboardHe
     const s = stats[hoveredKey];
     if (!s || s.count === 0) return (
       <div className="absolute top-4 right-4 bg-[var(--bg-surface)] p-4 rounded shadow-lg border border-[var(--border-color)] text-sm z-10">
-        <p className="font-bold uppercase mb-1">{hoveredKey}</p>
-        <p className="text-[var(--text-muted)]">No data yet</p>
+        <p className="font-bold uppercase mb-1">{hoveredKey === ' ' ? 'Espacio' : hoveredKey}</p>
+        <p className="text-[var(--text-muted)]">Sin datos todavía</p>
       </div>
     );
 
@@ -68,34 +68,41 @@ export function KeyboardHeatmap({ onPracticeKey, customPerKeyStats }: KeyboardHe
     return (
       <div className="absolute top-4 right-4 bg-[var(--bg-surface)] p-4 rounded shadow-lg border border-[var(--border-color)] text-sm z-10 w-48">
         <div className="flex justify-between items-center mb-2 border-b border-[var(--border-color)] pb-2">
-          <p className="font-bold uppercase text-lg">{hoveredKey === ' ' ? 'Space' : hoveredKey}</p>
+          <p className="font-bold uppercase text-lg">{hoveredKey === ' ' ? 'Espacio' : hoveredKey}</p>
           <span className={`px-2 py-0.5 rounded text-xs font-bold ${acc > 90 ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
             {acc}%
           </span>
         </div>
         <div className="flex justify-between py-1">
-          <span className="text-[var(--text-muted)]">Speed:</span>
+          <span className="text-[var(--text-muted)]">Reacción:</span>
           <span className="font-mono">{avgReaction}ms</span>
         </div>
         <div className="flex justify-between py-1">
-          <span className="text-[var(--text-muted)]">Errors:</span>
+          <span className="text-[var(--text-muted)]">Errores:</span>
           <span className="font-mono">{s.errors}</span>
         </div>
         <div className="flex justify-between py-1">
           <span className="text-[var(--text-muted)]">Total:</span>
-          <span className="font-mono">{s.count} presses</span>
+          <span className="font-mono">{s.count} pulsaciones</span>
         </div>
         
         {onPracticeKey && s.errors > 0 && (
           <button 
             onClick={() => onPracticeKey(hoveredKey)}
-            className="w-full mt-3 py-1.5 bg-[var(--bg-primary)] hover:bg-[var(--accent)] hover:text-white rounded text-xs font-medium transition-colors"
+            className="w-full mt-3 py-1.5 bg-[var(--bg-primary)] hover:bg-[var(--accent)] hover:text-black font-semibold rounded text-xs transition-colors"
           >
-            Practice this key
+            Practicar esta tecla
           </button>
         )}
       </div>
     );
+  };
+
+  const VIEW_MODE_LABELS: Record<ViewMode, string> = {
+    accuracy: "Precisión",
+    speed: "Velocidad",
+    errors: "Errores",
+    reactionTime: "Tiempo de reacción",
   };
 
   return (
@@ -108,13 +115,13 @@ export function KeyboardHeatmap({ onPracticeKey, customPerKeyStats }: KeyboardHe
           <button
             key={mode}
             onClick={() => setViewMode(mode)}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold capitalize transition-colors ${
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
               viewMode === mode 
-                ? 'bg-[var(--accent)] text-white' 
+                ? 'bg-[var(--accent)] text-black font-bold' 
                 : 'bg-[var(--bg-primary)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
             }`}
           >
-            {mode.replace(/([A-Z])/g, ' $1').trim()}
+            {VIEW_MODE_LABELS[mode]}
           </button>
         ))}
       </div>
@@ -123,7 +130,7 @@ export function KeyboardHeatmap({ onPracticeKey, customPerKeyStats }: KeyboardHe
         {QWERTY_ROWS.map((row, rIndex) => (
           <div key={rIndex} className="flex gap-2 justify-center w-full">
             {row.map((key) => {
-              const displayKey = key === ' ' ? 'space' : key;
+              const displayKey = key === ' ' ? 'espacio' : key;
               const isSpecial = key.length > 1 && key !== ' ';
               
               let widthClass = 'w-10 md:w-12';
@@ -163,19 +170,19 @@ export function KeyboardHeatmap({ onPracticeKey, customPerKeyStats }: KeyboardHe
       <div className="flex justify-center gap-6 mt-4 text-xs text-[var(--text-muted)]">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-green-500 opacity-80"></div>
-          <span>Good</span>
+          <span>Óptimo</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-yellow-500 opacity-80"></div>
-          <span>Average</span>
+          <span>Promedio</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-red-500 opacity-80"></div>
-          <span>Needs Practice</span>
+          <span>Por mejorar</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-[var(--bg-primary)] border border-[var(--border-color)]"></div>
-          <span>Unused</span>
+          <span>Sin usar</span>
         </div>
       </div>
     </div>
