@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 from datetime import datetime, timedelta, timezone
 
@@ -67,14 +68,26 @@ def remaining_seconds(token: str) -> int:
 
 _redis_client: aioredis.Redis | None = None
 _redis_url: str | None = None
+_redis_loop: asyncio.AbstractEventLoop | None = None
 
 
 def get_redis_client() -> aioredis.Redis:
     # An async client with a bounded connection pool (max 50 connections) to prevent
     # file descriptor exhaustion and connection starvation under concurrent requests.
-    global _redis_client, _redis_url
-    if _redis_client is None or _redis_url != settings.redis_url:
+    global _redis_client, _redis_url, _redis_loop
+    try:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
+
+    if (
+        _redis_client is None
+        or _redis_url != settings.redis_url
+        or _redis_loop != current_loop
+        or (current_loop and current_loop.is_closed())
+    ):
         _redis_url = settings.redis_url
+        _redis_loop = current_loop
         _redis_client = aioredis.from_url(
             settings.redis_url,
             socket_timeout=1.0,

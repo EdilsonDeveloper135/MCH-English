@@ -95,4 +95,3 @@ class SessionStatsSummaryOut(BaseModel):
 
 def stats_cache_key(user_id: uuid.UUID | str, days: int) -> str:
     return f"cache:stats:{user_id}:{days}"
-

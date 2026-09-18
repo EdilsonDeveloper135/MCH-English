@@ -5,6 +5,7 @@ from typing import Callable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import extract, func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.achievement import UserAchievement
@@ -120,23 +121,23 @@ async def collect_achievement_stats(db: AsyncSession, user_id: uuid.UUID) -> dic
     )
     has_accuracy_95 = (acc_res.scalar_one_or_none() or 0) > 0
 
-    # Night sessions (started_at between 00:00 and 05:00)
-    night_res = await db.execute(
-        select(func.count(TypingSession.id)).where(
-            TypingSession.user_id == user_id,
-            TypingSession.finished_at.is_not(None),
-            extract("hour", TypingSession.started_at) < 5,
-        )
-    )
-    night_sessions = night_res.scalar_one_or_none() or 0
-
-    # Streak calculation
+    # Timezone & Streak calculation
     settings = await settings_repository.get_or_create(db, user_id)
     tz_str = settings.timezone or "UTC"
     try:
         tz = ZoneInfo(tz_str)
     except (ZoneInfoNotFoundError, ValueError):
         tz = timezone.utc
+
+    # Night sessions (started_at between 00:00 and 05:00 in user's timezone)
+    night_res = await db.execute(
+        select(func.count(TypingSession.id)).where(
+            TypingSession.user_id == user_id,
+            TypingSession.finished_at.is_not(None),
+            extract("hour", func.timezone(tz_str, TypingSession.started_at)) < 5,
+        )
+    )
+    night_sessions = night_res.scalar_one_or_none() or 0
 
     active_dates = await gamification_repository.get_active_dates(db, user_id, tz_str=tz_str)
     today = datetime.now(tz).date()
@@ -178,12 +179,16 @@ async def evaluate_and_unlock(db: AsyncSession, user_id: uuid.UUID) -> list[dict
     for ach in ACHIEVEMENTS_CATALOG:
         if ach.id not in unlocked_ids:
             if ach.condition(stats):
-                row = UserAchievement(
-                    user_id=user_id,
-                    achievement_id=ach.id,
-                    seen=False,
+                stmt = (
+                    pg_insert(UserAchievement)
+                    .values(
+                        user_id=user_id,
+                        achievement_id=ach.id,
+                        seen=False,
+                    )
+                    .on_conflict_do_nothing(index_elements=["user_id", "achievement_id"])
                 )
-                db.add(row)
+                await db.execute(stmt)
                 new_unlocked.append({
                     "id": ach.id,
                     "name": ach.name,

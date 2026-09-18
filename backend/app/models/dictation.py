@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import DateTime, Float, ForeignKey, Integer
 from sqlalchemy import Text as SAText
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import UUID

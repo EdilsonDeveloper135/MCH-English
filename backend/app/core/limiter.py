@@ -9,4 +9,3 @@ limiter = Limiter(
     enabled=settings.rate_limit_enabled,
     headers_enabled=True,
 )
-

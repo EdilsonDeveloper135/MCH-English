@@ -20,7 +20,6 @@ class VocabularyItem(Base):
         Index("idx_user_vocab_user_last_seen", "user_id", "last_seen"),
     )
 
-
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False

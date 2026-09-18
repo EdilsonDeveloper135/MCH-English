@@ -20,4 +20,3 @@ async def test_dictionary_lookup_existing_word_returns_translations(client: Asyn
     data = res.json()
     assert data["word"] == "kitten"
     assert "gatito" in data["translations"]
-

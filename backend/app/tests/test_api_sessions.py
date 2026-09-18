@@ -74,7 +74,13 @@ async def test_finish_session_unlocks_the_first_session_achievement(
 
     await client.patch(
         f"/sessions/{session['id']}",
-        json={"correct_characters": 10, "incorrect_characters": 0, "total_characters": 10, "duration_seconds": 5, "errors": []},
+        json={
+            "correct_characters": 10,
+            "incorrect_characters": 0,
+            "total_characters": 10,
+            "duration_seconds": 5,
+            "errors": [],
+        },
         headers=auth_headers,
     )
 
@@ -97,7 +103,13 @@ async def test_a_user_cannot_finish_another_users_session(
 
     response = await client.patch(
         f"/sessions/{session['id']}",
-        json={"correct_characters": 1, "incorrect_characters": 0, "total_characters": 1, "duration_seconds": 1, "errors": []},
+        json={
+            "correct_characters": 1,
+            "incorrect_characters": 0,
+            "total_characters": 1,
+            "duration_seconds": 1,
+            "errors": [],
+        },
         headers=other_headers,
     )
     assert response.status_code == 404
@@ -161,3 +173,60 @@ async def test_history_rejects_an_out_of_range_day_window(client: AsyncClient, a
 
     ok = await client.get("/statistics/history?days=30", headers=auth_headers)
     assert ok.status_code == 200
+
+
+async def test_finish_session_returns_new_achievements(
+    client: AsyncClient, auth_headers: dict[str, str], process_text_now
+):
+    ids = await _create_ready_text_with_chunk(client, auth_headers, process_text_now)
+    session = (await client.post("/sessions", json=ids, headers=auth_headers)).json()
+
+    res = await client.patch(
+        f"/sessions/{session['id']}",
+        json={
+            "correct_characters": 25,
+            "incorrect_characters": 0,
+            "total_characters": 25,
+            "duration_seconds": 10.0,
+            "errors": [],
+        },
+        headers=auth_headers,
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "new_achievements" in data
+    assert any(a["id"] == "first_session" for a in data["new_achievements"])
+
+
+async def test_get_stats_summary_and_cache_invalidation(
+    client: AsyncClient, auth_headers: dict[str, str], process_text_now
+):
+    ids = await _create_ready_text_with_chunk(client, auth_headers, process_text_now)
+    session = (await client.post("/sessions", json=ids, headers=auth_headers)).json()
+    await client.patch(
+        f"/sessions/{session['id']}",
+        json={
+            "correct_characters": 15,
+            "incorrect_characters": 1,
+            "total_characters": 16,
+            "duration_seconds": 8.0,
+            "errors": [{"expected_char": "a", "typed_char": "b", "position": 0, "word": "apple"}],
+        },
+        headers=auth_headers,
+    )
+
+    # 1. Fetch summary stats
+    res = await client.get("/sessions/stats/summary?days=30", headers=auth_headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert "wpm_trend" in data
+    assert "error_chars" in data
+    assert "daily_summary" in data
+    assert "recent_sessions" in data
+    assert len(data["recent_sessions"]) >= 1
+    assert data["recent_sessions"][0]["errors"] == 1
+
+    # 2. Fetch again (should hit Redis cache)
+    cached_res = await client.get("/sessions/stats/summary?days=30", headers=auth_headers)
+    assert cached_res.status_code == 200
+    assert cached_res.json()["recent_sessions"][0]["id"] == data["recent_sessions"][0]["id"]

@@ -17,4 +17,3 @@ def test_calculate_wpm_typical():
 
 def test_calculate_wpm_zero_duration():
     assert calculate_wpm(100, 0) == 0.0
-

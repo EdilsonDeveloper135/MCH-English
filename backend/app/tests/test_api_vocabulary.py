@@ -46,4 +46,3 @@ async def test_list_vocabulary_with_existing_records(client: AsyncClient, auth_h
     assert weak.status_code == 200
     assert len(weak.json()) == 1
     assert weak.json()[0]["word"] == "persistent"
-
