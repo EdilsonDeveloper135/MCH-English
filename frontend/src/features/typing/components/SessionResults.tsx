@@ -30,9 +30,13 @@ export function SessionResults({
       // Ignore if user is typing in an input
       if (["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName)) return;
 
-      if (e.key === "Enter" && onNext) {
+      if (e.key === "Enter") {
         e.preventDefault();
-        onNext();
+        if (onNext) {
+          onNext();
+        } else {
+          onBackToLibrary();
+        }
       } else if (e.key.toLowerCase() === "r" && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         onAgain();
@@ -44,7 +48,7 @@ export function SessionResults({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onAgain, onNext, onQuickPractice]);
+  }, [onAgain, onNext, onQuickPractice, onBackToLibrary]);
 
   const deltaWpm = previousWpm !== undefined ? result.wpm - previousWpm : null;
 

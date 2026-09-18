@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { GhostData, PerKeyStats, UserPreferences } from "@/types/typing";
 
 /** Ghost runs are a nicety, not history: keeping one entry per chunk ever practiced
@@ -106,6 +106,15 @@ export const useTypingStore = create<TypingStore>()(
     }),
     {
       name: "mch-english-typing-storage",
+      storage: createJSONStorage(() =>
+        typeof window !== "undefined"
+          ? window.localStorage
+          : {
+              getItem: () => null,
+              setItem: () => {},
+              removeItem: () => {},
+            }
+      ),
       partialize: (state) => ({
         preferences: state.preferences,
         perKeyStats: state.perKeyStats,
